@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'install.sh'
+      - 'ecosystem.core.config.cjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/pack-github-release.sh'
+      - 'packages/server/**'
+      - 'packages/web-ui/**'
   workflow_dispatch:
 
 permissions:
