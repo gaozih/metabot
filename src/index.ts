@@ -6,6 +6,7 @@ import { createLogger, type Logger } from './utils/logger.js';
 import { createEventDispatcher } from './feishu/event-handler.js';
 import { MessageSender } from './feishu/message-sender.js';
 import { FeishuSenderAdapter } from './feishu/feishu-sender-adapter.js';
+import { resolveFeishuWsRecoveryOptions } from './feishu/ws-recovery.js';
 import { MessageBridge } from './bridge/message-bridge.js';
 import { loadRestartBreadcrumb } from './bridge/restart-notice.js';
 import type { IMessageSender } from './bridge/message-sender.interface.js';
@@ -114,18 +115,31 @@ async function startFeishuBot(botConfig: BotConfig, logger: Logger, localAgent?:
     },
   );
 
-  // Create WebSocket client
+  // Create WebSocket client with bounded liveness/reconnect controls.
+  const wsRecovery = resolveFeishuWsRecoveryOptions();
   const wsClient = new lark.WSClient({
     appId: botConfig.feishu.appId,
     appSecret: botConfig.feishu.appSecret,
     loggerLevel: lark.LoggerLevel.info,
     agent: localAgent,
+    ...wsRecovery,
+    onReady: () => botLogger.info('Feishu WebSocket connected'),
+    onReconnecting: () => botLogger.warn('Feishu WebSocket disconnected; reconnecting'),
+    onReconnected: () => botLogger.info('Feishu WebSocket reconnected'),
+    onError: (err) => botLogger.error({ err: err.message }, 'Feishu WebSocket recovery failed'),
   });
+  botLogger.info(
+    {
+      pingTimeoutSec: wsRecovery.wsConfig.pingTimeout,
+      handshakeTimeoutMs: wsRecovery.handshakeTimeoutMs,
+    },
+    'Feishu WebSocket recovery enabled',
+  );
 
   // Start WebSocket connection with event dispatcher
   await wsClient.start({ eventDispatcher: dispatcher });
 
-  botLogger.info('Feishu bot is running');
+  botLogger.info('Feishu bot channel initialized');
   botLogger.info({
     defaultWorkingDirectory: botConfig.claude.defaultWorkingDirectory,
     maxTurns: botConfig.claude.maxTurns ?? 'unlimited',
@@ -243,6 +257,7 @@ async function main() {
       bridge: handle.bridge,
       sender: handle.sender,
       feishuClient: handle.feishuClient,
+      connectionStatus: () => handle.wsClient.getConnectionStatus(),
     });
   }
 
