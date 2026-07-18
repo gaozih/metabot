@@ -27,11 +27,6 @@ function err(status: number, error: string): RouteResult {
   return { status, body: { error } };
 }
 
-function requireWeb(cred: Credential): RouteResult | null {
-  if (cred.authSource !== 'web') return err(403, 'web_identity_required');
-  return null;
-}
-
 function userRef(cred: Credential): string {
   return cred.ownerName || cred.botName;
 }
@@ -41,9 +36,7 @@ function asStringArray(value: unknown): string[] {
 }
 
 function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function parseParticipants(body: Record<string, unknown>): Array<{
@@ -119,29 +112,22 @@ function withChatErrors(fn: () => RouteResult): RouteResult {
 
 function parseEventKind(value: unknown): ChatRunEventKind | null {
   if (
-    value === 'state'
-    || value === 'complete'
-    || value === 'question'
-    || value === 'file'
-    || value === 'log'
-    || value === 'error'
-  ) return value;
+    value === 'state' ||
+    value === 'complete' ||
+    value === 'question' ||
+    value === 'file' ||
+    value === 'log' ||
+    value === 'error'
+  )
+    return value;
   return null;
 }
 
 export function listConversations(deps: ChatRouteDeps, cred: Credential): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
   return { status: 200, body: { conversations: deps.chat.listConversationsForUser(userRef(cred)) } };
 }
 
-export function createConversation(
-  deps: ChatRouteDeps,
-  body: Record<string, unknown>,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function createConversation(deps: ChatRouteDeps, body: Record<string, unknown>, cred: Credential): RouteResult {
   const kind = body.kind === 'dm' ? 'dm' : 'group';
   const participants = parseParticipants(body);
   const agentRefs = participants.filter((p) => p.kind === 'agent').map((p) => p.ref);
@@ -159,13 +145,7 @@ export function createConversation(
   }));
 }
 
-export function findOrCreateAgentDm(
-  deps: ChatRouteDeps,
-  body: Record<string, unknown>,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function findOrCreateAgentDm(deps: ChatRouteDeps, body: Record<string, unknown>, cred: Credential): RouteResult {
   const botName = typeof body.botName === 'string' ? body.botName.trim() : '';
   if (!botName) return err(400, 'bot_name_required');
   const agent = visibleAgent(deps.agents, botName, cred);
@@ -180,18 +160,9 @@ export function findOrCreateAgentDm(
   };
 }
 
-export function findOrCreateUserDm(
-  deps: ChatRouteDeps,
-  body: Record<string, unknown>,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
-  const rawRef = typeof body.userRef === 'string'
-    ? body.userRef.trim()
-    : typeof body.email === 'string'
-      ? body.email.trim()
-      : '';
+export function findOrCreateUserDm(deps: ChatRouteDeps, body: Record<string, unknown>, cred: Credential): RouteResult {
+  const rawRef =
+    typeof body.userRef === 'string' ? body.userRef.trim() : typeof body.email === 'string' ? body.email.trim() : '';
   const otherUserRef = rawRef.toLowerCase();
   if (!otherUserRef) return err(400, 'user_ref_required');
   if (!isEmailRef(otherUserRef)) return err(400, 'user_ref_email_required');
@@ -206,13 +177,7 @@ export function findOrCreateUserDm(
   }));
 }
 
-export function searchParticipants(
-  deps: ChatRouteDeps,
-  query: URLSearchParams,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function searchParticipants(deps: ChatRouteDeps, query: URLSearchParams, cred: Credential): RouteResult {
   const q = (query.get('q') || '').trim();
   if (!q) return { status: 200, body: { participants: [] } };
   const qLower = q.toLowerCase();
@@ -240,8 +205,6 @@ export function searchParticipants(
 }
 
 export function getConversation(deps: ChatRouteDeps, id: string, cred: Credential): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
   return withChatErrors(() => ({
     status: 200,
     body: deps.chat.getConversationForUser(id, userRef(cred)),
@@ -249,8 +212,6 @@ export function getConversation(deps: ChatRouteDeps, id: string, cred: Credentia
 }
 
 export function listParticipants(deps: ChatRouteDeps, id: string, cred: Credential): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
   return withChatErrors(() => ({
     status: 200,
     body: { participants: deps.chat.listParticipants(id, userRef(cred)) },
@@ -263,8 +224,6 @@ export function addParticipant(
   body: Record<string, unknown>,
   cred: Credential,
 ): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
   const kind = body.kind === 'agent' ? 'agent' : body.kind === 'user' ? 'user' : null;
   const rawRef = typeof body.ref === 'string' ? body.ref.trim() : '';
   const ref = kind === 'user' ? rawRef.toLowerCase() : rawRef;
@@ -280,14 +239,7 @@ export function addParticipant(
   }));
 }
 
-export function listMessages(
-  deps: ChatRouteDeps,
-  id: string,
-  query: URLSearchParams,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function listMessages(deps: ChatRouteDeps, id: string, query: URLSearchParams, cred: Credential): RouteResult {
   const limitRaw = query.get('limit');
   const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
   const before = query.get('before') || undefined;
@@ -303,8 +255,6 @@ export function postMessage(
   body: Record<string, unknown>,
   cred: Credential,
 ): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
   const content = typeof body.content === 'string' ? body.content : '';
   const engine = parseEngine(body.engine);
   const model = typeof body.model === 'string' ? body.model.trim() : undefined;
@@ -337,13 +287,15 @@ function postMessageUnchecked(
     runId: null,
   });
   const triggerAgentRefs = conversation.kind === 'dm' ? agentParticipants : mentionedAgentRefs;
-  const runs = triggerAgentRefs.map((targetAgentRef) => deps.chat.createRun({
-    conversationId: id,
-    triggerMessageId: message.id,
-    targetAgentRef,
-    engine: options.engine,
-    model: options.model,
-  }));
+  const runs = triggerAgentRefs.map((targetAgentRef) =>
+    deps.chat.createRun({
+      conversationId: id,
+      triggerMessageId: message.id,
+      targetAgentRef,
+      engine: options.engine,
+      model: options.model,
+    }),
+  );
   for (const run of runs) {
     deps.deliverRun?.({
       id: run.id,
@@ -383,50 +335,28 @@ export function markRead(
   body: Record<string, unknown>,
   cred: Credential,
 ): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
-  const messageId = body.messageId === null
-    ? null
-    : typeof body.messageId === 'string' ? body.messageId : null;
+  const messageId = body.messageId === null ? null : typeof body.messageId === 'string' ? body.messageId : null;
   return withChatErrors(() => ({
     status: 200,
     body: deps.chat.markRead(id, userRef(cred), messageId),
   }));
 }
 
-export function listRuns(
-  deps: ChatRouteDeps,
-  id: string,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function listRuns(deps: ChatRouteDeps, id: string, cred: Credential): RouteResult {
   return withChatErrors(() => ({
     status: 200,
     body: { runs: deps.chat.listRuns(id, userRef(cred)) },
   }));
 }
 
-export function listRunEvents(
-  deps: ChatRouteDeps,
-  runId: string,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function listRunEvents(deps: ChatRouteDeps, runId: string, cred: Credential): RouteResult {
   return withChatErrors(() => ({
     status: 200,
     body: { events: deps.chat.listRunEventsForUser(runId, userRef(cred)) },
   }));
 }
 
-export function listFiles(
-  deps: ChatRouteDeps,
-  id: string,
-  cred: Credential,
-): RouteResult {
-  const web = requireWeb(cred);
-  if (web) return web;
+export function listFiles(deps: ChatRouteDeps, id: string, cred: Credential): RouteResult {
   return withChatErrors(() => ({
     status: 200,
     body: { files: deps.chat.listFiles(id, userRef(cred)) },

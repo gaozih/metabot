@@ -60,7 +60,7 @@ curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/insta
 
 MetaBot 开箱即是**可自托管的个人版**：本地跑、单 token 鉴权、**不依赖任何 SSO / 企业登录**。
 
-- **本地优先**：`metabot-core` 默认只监听 `http://localhost:9200`，首次启动自动生成本地 API token（写入 `~/.metabot-core/token`）。CLI 与 Web 控制台都用它鉴权。数据默认落在 `~/.metabot-core/`。
+- **本地优先**：`metabot-core` 默认只监听 `http://localhost:9200`，首次启动把一次性管理员 Token 写入 `~/.metabot-core/data/admin-bootstrap-token.txt`。把它粘贴到 Web 控制台登录页，也可另存为 `~/.metabot-core/token`（权限 `0600`）供 CLI 使用。数据默认落在 `~/.metabot-core/`。
 - **无需 SSO**：不需要 OAuth / OIDC / 企业 VPN。要多人或公网访问时，自行在前面挂一个反向代理（可选 oauth2-proxy）即可，应用层不强制。
 - **分发端点默认上锁**：`/cli/*`、`/install/*` 安装分发端点默认需要 token；确认你的构建不含密钥后，可设 `METABOT_PUBLIC_DISTRIBUTION=1` 放开匿名下载。
 
@@ -409,7 +409,7 @@ MetaBot 支持 4 种方式与你的 Agent 团队交互：
 | `API_PORT` | 9100 | HTTP API 端口 |
 | `API_SECRET` | — | Bearer 认证（同时保护 API 和 Web UI） |
 | `METABOT_CORE_URL` | `http://localhost:9200` | metabot-core 服务地址（MetaMemory + Skill Hub + Agents + T5T），本地自托管或填你自己的远程地址 |
-| `METABOT_CORE_TOKEN` | 读 `~/.metabot-core/token` | metabot-core Bearer Token（在 `<METABOT_CORE_URL>/cli` 自助生成） |
+| `METABOT_CORE_TOKEN` | 读 `~/.metabot-core/token` | metabot-core Bearer Token；首次启动从 `~/.metabot-core/data/admin-bootstrap-token.txt` 获取 |
 | `WIKI_SYNC_ENABLED` | true | 启用 MetaMemory→飞书知识库同步 |
 | `WIKI_SPACE_NAME` | MetaMemory | 飞书知识库空间名称 |
 | `WIKI_SYNC_STATE_DIR` | `./data` | Wiki 同步映射 SQLite 存放目录 |
@@ -547,7 +547,7 @@ metabot voice tts "你好世界" --play
 
 `metabot update` 会自动更新已安装的 `lark-cli` 和飞书/Lark skills，并同步到 bot 工作目录；新机器首次安装时仍由安装器引导是否启用飞书 skills。
 
-CLI 支持连接远程 MetaBot 服务器，在 `~/.metabot/.env` 配置 `METABOT_URL` 即可；MetaMemory / Skill Hub / Agents / T5T 由 metabot-core 统一提供，配置 `METABOT_CORE_URL` + `METABOT_CORE_TOKEN`，在 `<METABOT_CORE_URL>/cli` 自助获取 Token。
+CLI 支持连接远程 MetaBot 服务器，在 `~/.metabot/.env` 配置 `METABOT_URL` 即可；MetaMemory / Skill Hub / Agents / T5T 由 metabot-core 统一提供，配置 `METABOT_CORE_URL` + `METABOT_CORE_TOKEN`。个人版不依赖企业登录，Token 由本地管理员创建和轮换。
 
 </details>
 

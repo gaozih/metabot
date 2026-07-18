@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "echo 'no SPA unit tests in v1' && exit 0",
+    "test": "vitest run",
     "lint": "echo 'lint not configured for web-ui v1'"
   },
   "dependencies": {
