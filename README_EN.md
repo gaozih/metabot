@@ -60,7 +60,7 @@ The installer walks you through everything: working directory → **engine choic
 
 MetaBot is a **self-hostable personal edition** out of the box: runs locally, single-token auth, **no SSO or corporate login required**.
 
-- **Local-first**: `metabot-core` listens on `http://localhost:9200` by default and generates a local API token on first launch (written to `~/.metabot-core/token`). The CLI and web console both authenticate with it. Data lives under `~/.metabot-core/` by default.
+- **Local-first**: `metabot-core` listens on `http://localhost:9200` by default and writes the one-time admin token to `~/.metabot-core/data/admin-bootstrap-token.txt` on first launch. Paste it into the web console login screen, and optionally save it as `~/.metabot-core/token` (mode `0600`) for CLI use. Data lives under `~/.metabot-core/` by default.
 - **No SSO**: no OAuth / OIDC / corporate VPN needed. To expose it to other people or the public internet, put your own reverse proxy (optionally oauth2-proxy) in front — it's never required at the app layer.
 - **Distribution endpoints are locked by default**: `/cli/*` and `/install/*` require a token; once you've confirmed your build embeds no secrets, set `METABOT_PUBLIC_DISTRIBUTION=1` to allow anonymous downloads.
 
@@ -412,7 +412,7 @@ Supported: text, images (Claude multimodal), files (PDF/code/docs), rich text (P
 | `API_PORT` | 9100 | HTTP API port |
 | `API_SECRET` | — | Bearer token auth (protects API + Web UI). Generate one with `openssl rand -hex 32` |
 | `METABOT_CORE_URL` | `http://localhost:9200` | metabot-core service URL (MetaMemory + Skill Hub + Agents + T5T) — self-host locally or point at your own remote host |
-| `METABOT_CORE_TOKEN` | reads `~/.metabot-core/token` | Bearer token for metabot-core |
+| `METABOT_CORE_TOKEN` | reads `~/.metabot-core/token` | Bearer token for metabot-core; obtain the first token from `~/.metabot-core/data/admin-bootstrap-token.txt` |
 | `WIKI_SYNC_ENABLED` | true | Enable MetaMemory→Wiki sync |
 | `WIKI_SPACE_NAME` | MetaMemory | Wiki space name |
 | `WIKI_SYNC_STATE_DIR` | `./data` | Directory holding the wiki-sync mapping SQLite |
@@ -546,7 +546,7 @@ lark-cli im +messages-send --chat-id oc_xxx --text "Hi"
 lark-cli calendar +agenda --as user
 ```
 
-CLI supports connecting to a remote MetaBot server — configure `METABOT_URL` in `~/.metabot/.env`. MetaMemory / Skill Hub / Agents / T5T all live in central metabot-core inside this monorepo at `packages/server/`; configure `METABOT_CORE_URL` + `METABOT_CORE_TOKEN`, get a token at `<METABOT_CORE_URL>/cli`.
+CLI supports connecting to a remote MetaBot server — configure `METABOT_URL` in `~/.metabot/.env`. MetaMemory / Skill Hub / Agents / T5T live in metabot-core inside this monorepo at `packages/server/`; configure `METABOT_CORE_URL` + `METABOT_CORE_TOKEN`. The personal edition has no enterprise login dependency; its local administrator creates and rotates tokens.
 
 </details>
 

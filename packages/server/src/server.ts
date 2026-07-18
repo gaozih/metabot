@@ -901,7 +901,7 @@ export function startServer(options: ServerOptions): ServerHandle {
         return jsonResult(res, inboxRoutes.clearInbox(inboxStore, agentStore, botName, query, cred));
       }
 
-      // ---- Chat routes (browser SSO only) ----
+      // ---- Chat routes (Bearer-authenticated personal console) ----
       if (pathname === '/api/chat/participants/search' && method === 'GET') {
         return jsonResult(res, chatRoutes.searchParticipants(chatDeps, query, cred));
       }
