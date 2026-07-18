@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -7,57 +8,32 @@ import { fileURLToPath } from 'node:url';
 // Smoke test for packages/server/scripts/pack-metabot.sh.
 //
 // The script reaches up from packages/server/scripts/ to the repo root, so we
-// just invoke it as-is and inspect the published artifacts. Tarball + bootstrap
-// land under packages/server/static/install/. We snapshot any pre-existing
-// outputs and restore them after the test so a developer running this against
-// a previously-built repo doesn't lose their tarball.
+// invoke it as-is but redirect outputs into a temporary directory. Packaging
+// tests must never overwrite the real publishable artifacts.
 
 const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(PKG_DIR, 'scripts', 'pack-metabot.sh');
-const OUT_DIR = path.join(PKG_DIR, 'static', 'install');
+const OUT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'metabot-pack-test-'));
 const TARBALL_PATH = path.join(OUT_DIR, 'latest.tgz');
 const BOOTSTRAP_PATH = path.join(OUT_DIR, 'install.sh');
 
-let preExistingTarball: Buffer | undefined;
-let preExistingBootstrap: Buffer | undefined;
-let preExistingDir = false;
 let tarListing: string = '';
-let scriptRan = false;
 
 beforeAll(() => {
-  if (fs.existsSync(OUT_DIR)) {
-    preExistingDir = true;
-    if (fs.existsSync(TARBALL_PATH)) preExistingTarball = fs.readFileSync(TARBALL_PATH);
-    if (fs.existsSync(BOOTSTRAP_PATH)) preExistingBootstrap = fs.readFileSync(BOOTSTRAP_PATH);
-  }
-
-  // Run the pack script. tar / rsync / bash must be available; they are on
-  // every supported dev host (Linux + macOS) and the CI image.
   execSync(`bash ${JSON.stringify(SCRIPT)}`, {
+    env: {
+      ...process.env,
+      METABOT_PACK_OUTPUT_DIR: OUT_DIR,
+    },
     stdio: 'pipe',
     // Pack script writes a few lines to stdout; capture them for failure
     // diagnostics but don't pollute test output on success.
   });
-  scriptRan = true;
-
   tarListing = execSync(`tar tzf ${JSON.stringify(TARBALL_PATH)}`, { encoding: 'utf-8' });
 }, 60_000);
 
 afterAll(() => {
-  if (!scriptRan) return;
-  if (preExistingTarball !== undefined) {
-    fs.writeFileSync(TARBALL_PATH, preExistingTarball);
-  } else if (fs.existsSync(TARBALL_PATH)) {
-    fs.unlinkSync(TARBALL_PATH);
-  }
-  if (preExistingBootstrap !== undefined) {
-    fs.writeFileSync(BOOTSTRAP_PATH, preExistingBootstrap);
-  } else if (fs.existsSync(BOOTSTRAP_PATH)) {
-    fs.unlinkSync(BOOTSTRAP_PATH);
-  }
-  if (!preExistingDir) {
-    try { fs.rmdirSync(OUT_DIR); } catch { /* keep if non-empty */ }
-  }
+  fs.rmSync(OUT_DIR, { recursive: true, force: true });
 });
 
 describe('pack-metabot.sh', () => {
@@ -100,6 +76,42 @@ describe('pack-metabot.sh', () => {
     // `--mtime='UTC 2026-01-01'`: local files modified after that date
     // silently survive, defeating the overlay refresh.
     expect(codeOnly).not.toContain('--keep-newer-files');
+  });
+
+  it('packaged install builds only the bridge runtime and the delegated CLI', () => {
+    const installSh = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} install.sh`, { encoding: 'utf-8' });
+    expect(installSh).toContain('npm run build:bridge');
+    expect(installSh).toContain('npm run build -w @xvirobotics/cli');
+    expect(installSh).not.toContain('npm run build --workspaces');
+  });
+
+  it('rewrites root manifests for the runtime-only workspace subset', () => {
+    const packageJson = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} package.json`, { encoding: 'utf-8' });
+    const pkg = JSON.parse(packageJson);
+    expect(pkg.scripts.build).toBe('npm run build:bridge');
+    expect(pkg.scripts['build:web']).toBeUndefined();
+    expect(pkg.workspaces).toEqual(['packages/cli', 'packages/cli-core', 'packages/metamemory', 'packages/skill-hub']);
+
+    const tsconfigJson = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} tsconfig.json`, { encoding: 'utf-8' });
+    const tsconfig = JSON.parse(tsconfigJson);
+    const references = tsconfig.references.map((ref: { path: string }) => ref.path);
+    expect(references).toContain('./tsconfig.bridge.json');
+    expect(references).not.toContain('./packages/server');
+    expect(references).not.toContain('./packages/web-ui');
+  });
+
+  it('embeds a non-sensitive runtime package manifest', () => {
+    expect(tarListing).toContain('.metabot-package/manifest.json');
+    const json = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} .metabot-package/manifest.json`, {
+      encoding: 'utf-8',
+    });
+    const manifest = JSON.parse(json);
+    expect(manifest).toMatchObject({
+      schemaVersion: 1,
+      package: 'metabot-runtime',
+      channel: 'install',
+    });
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it('tarball includes the bot-host runtime entrypoints', () => {
@@ -151,12 +163,19 @@ describe('pack-metabot.sh', () => {
     fs.writeFileSync(secretPath, 'METABOT_VOICE_REPLY_DEFAULT_ON=true\nVOLCENGINE_TTS_APPID=test-app\n');
 
     try {
-      execSync(`METABOT_PACKAGE_DEFAULT_ENV_FILE=${JSON.stringify(secretPath)} bash ${JSON.stringify(SCRIPT)}`, {
+      execSync(`bash ${JSON.stringify(SCRIPT)}`, {
+        env: {
+          ...process.env,
+          METABOT_PACKAGE_DEFAULT_ENV_FILE: secretPath,
+          METABOT_PACK_OUTPUT_DIR: OUT_DIR,
+        },
         stdio: 'pipe',
       });
       const listing = execSync(`tar tzf ${JSON.stringify(TARBALL_PATH)}`, { encoding: 'utf-8' });
       expect(listing).toContain('.metabot-package/default.env');
-      const content = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} .metabot-package/default.env`, { encoding: 'utf-8' });
+      const content = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} .metabot-package/default.env`, {
+        encoding: 'utf-8',
+      });
       expect(content).toContain('METABOT_VOICE_REPLY_DEFAULT_ON=true');
       expect(content).toContain('VOLCENGINE_TTS_APPID=test-app');
     } finally {

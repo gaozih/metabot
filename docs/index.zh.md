@@ -43,7 +43,7 @@ MetaBot 把它们都解放出来。给每个 Agent 一个 **Claude Code 或 Kimi
 === "Linux / macOS"
 
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/xvirobotics/metabot/main/install.sh | bash
+    curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
     ```
 
 === "Windows (PowerShell)"

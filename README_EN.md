@@ -45,15 +45,14 @@
 </div>
 
 ```bash
-git clone https://github.com/xvirobotics/metabot.git ~/metabot
-cd ~/metabot && bash install.sh
+curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
 ```
 
 The installer walks you through everything: working directory → **engine choice (Claude / Kimi / Codex)** → subscription login → IM platform → auto-start with PM2. **5 minutes to get started.**
 
 > Custom install directory (default `~/metabot`): clone into the directory you want, or `METABOT_HOME=/opt/metabot bash install.sh`. Windows: `.\install.ps1 -Dir C:\opt\metabot`.
 >
-> One-line install also works: `curl -fsSL https://raw.githubusercontent.com/xvirobotics/metabot/main/install.sh | bash`.
+> For source development: `git clone https://github.com/xvirobotics/metabot.git ~/metabot && cd ~/metabot && bash install.sh`. Release installs and source checkouts use separate update paths; `metabot update` detects the right one automatically.
 
 ---
 

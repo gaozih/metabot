@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify tag matches package version
+        if: github.event_name == 'push'
+        run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
+
+      - name: Run package contract tests
+        run: npm exec --workspace @xvirobotics/metabot-core-server -- vitest run tests/pack-metabot.test.ts tests/pack-github-release.test.ts
+
+      - name: Build release assets
+        run: npm run pack:github
+
+      - name: Verify release assets
+        run: |
+          bash -n dist/github-release/install.sh scripts/pack-github-release.sh packages/server/scripts/pack-metabot.sh
+          (cd dist/github-release && sha256sum -c SHA256SUMS)
+          tar tzf dist/github-release/metabot-runtime.tgz >/dev/null
+
+      - name: Smoke extracted runtime install and build
+        run: |
+          smoke_dir="$(mktemp -d)"
+          tar xzf dist/github-release/metabot-runtime.tgz -C "$smoke_dir"
+          cd "$smoke_dir"
+          npm install --include=dev \
+            --workspace=@xvirobotics/cli \
+            --workspace=@xvirobotics/cli-core \
+            --workspace=@xvirobotics/metamemory \
+            --workspace=@xvirobotics/skill-hub \
+            --include-workspace-root
+          npm run build:bridge
+          npm run build -w @xvirobotics/cli
+          test -f dist/index.js
+          test -f packages/cli/dist/index.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metabot-github-release
+          path: dist/github-release/*
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          dist/github-release/install.sh
+          dist/github-release/metabot-runtime.tgz
+          dist/github-release/SHA256SUMS
+          --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

@@ -13,7 +13,7 @@ function makeTempDir(): string {
 }
 
 describe('metabot update source selection', () => {
-  it('defaults to the internal package refresh even when .git exists', () => {
+  it('uses the GitHub Release installer for package-managed installs', () => {
     const tmp = makeTempDir();
     const fakeBin = path.join(tmp, 'bin');
     const metabotHome = path.join(tmp, 'metabot');
@@ -21,14 +21,20 @@ describe('metabot update source selection', () => {
     const curlArgs = path.join(tmp, 'curl-args.txt');
 
     fs.mkdirSync(fakeBin, { recursive: true });
+    fs.mkdirSync(metabotHome, { recursive: true });
     fs.mkdirSync(path.join(metabotHome, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(metabotHome, '.metabot-package'), { recursive: true });
+    fs.writeFileSync(
+      path.join(metabotHome, '.metabot-package', 'manifest.json'),
+      '{"schemaVersion":1,"package":"metabot-runtime"}\n',
+    );
     fs.writeFileSync(path.join(metabotHome, 'install.sh'), '#!/usr/bin/env bash\n');
     fs.writeFileSync(
       path.join(fakeBin, 'curl'),
       [
         '#!/usr/bin/env bash',
         'printf "%s\\n" "$*" > "$CURL_ARGS_FILE"',
-        'cat <<\'SH\'',
+        "cat <<'SH'",
         '#!/usr/bin/env bash',
         'printf "package:%s\\n" "$METABOT_HOME" > "$MARKER"',
         'SH',
@@ -42,7 +48,6 @@ describe('metabot update source selection', () => {
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
         METABOT_HOME: metabotHome,
-        METABOT_CORE_URL: 'https://core.example.test',
         MARKER: marker,
         CURL_ARGS_FILE: curlArgs,
       },
@@ -50,13 +55,18 @@ describe('metabot update source selection', () => {
     });
 
     expect(fs.readFileSync(marker, 'utf-8').trim()).toBe(`package:${metabotHome}`);
-    expect(fs.readFileSync(curlArgs, 'utf-8')).toContain('https://core.example.test/install/install.sh');
+    expect(fs.readFileSync(curlArgs, 'utf-8')).toContain(
+      'https://github.com/xvirobotics/metabot/releases/latest/download/install.sh',
+    );
   });
 
-  it('documents the explicit developer git opt-in path', () => {
+  it('defaults source checkouts to git and keeps explicit source overrides', () => {
     const source = fs.readFileSync(METABOT_BIN, 'utf-8');
-    expect(source).toContain('METABOT_UPDATE_SOURCE:-package');
+    expect(source).toContain('METABOT_UPDATE_SOURCE:-auto');
+    expect(source).toContain('if [[ -f "$METABOT_HOME/.metabot-package/manifest.json" ]]');
+    expect(source).toContain('elif [[ -d "$METABOT_HOME/.git" ]]');
     expect(source).toContain('metabot update --git');
+    expect(source).toContain('metabot update --package');
     expect(source).toContain('exec "$METABOT_HOME/bin/metabot" update --git');
   });
 });

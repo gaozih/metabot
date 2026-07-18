@@ -1,6 +1,6 @@
 {
   "name": "metabot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MetaBot — Bridge service connecting IM bots (Feishu/Lark, Telegram) to Claude Code Agent SDK",
   "main": "dist/index.js",
   "type": "module",
@@ -26,6 +26,7 @@
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
+    "pack:github": "bash scripts/pack-github-release.sh",
     "update-cli": "cp bin/metabot ~/.local/bin/metabot && chmod +x ~/.local/bin/metabot && echo \"Updated: metabot\" && rm -f ~/.local/bin/mb ~/.local/bin/mm ~/.local/bin/mh"
   },
   "dependencies": {

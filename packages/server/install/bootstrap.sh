@@ -1,36 +1,34 @@
 #!/usr/bin/env bash
 #
-# metabot bootstrap — internal-network one-line installer.
+# metabot bootstrap — package one-line installer.
 #
 # Usage:
-#   curl -fsSL http://localhost:9200/install/install.sh | bash
+#   curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
 #   curl -fsSL ... | METABOT_HOME=/opt/metabot bash
 #   curl -fsSL ... | bash -s -- --dir /opt/metabot
 #
 # What this does:
 #   1. Resolve METABOT_HOME (--dir > env > $HOME/metabot).
-#   2. Download latest.tgz from $METABOT_CORE_URL/install/latest.tgz.
+#   2. Download the runtime tarball from METABOT_PACKAGE_TARBALL_URL, falling
+#      back to the legacy metabot-core install endpoint.
 #   3. Extract into $METABOT_HOME, overwriting code files (`bin/`, `src/`,
 #      `packages/`, `install.sh`, etc.). User state — `.env`, `bots.json`,
 #      `logs/`, `data/` — is NOT in the tarball and survives trivially.
 #      Any pre-existing `.git/` is also preserved (tarball excludes it), so
 #      developers who hand-clone can still `git pull` later if they want,
 #      but the bootstrap itself never touches a remote.
-#   4. If the internal tarball includes `.metabot-package/default.env`, copy it
+#   4. If the package includes `.metabot-package/default.env`, copy it
 #      to `~/.metabot/default.env` with chmod 600 and remove the extracted copy.
 #   5. exec install.sh with METABOT_SKIP_GIT=1 so its Phase 2 skips the
 #      clone/pull branch entirely and proceeds straight to npm install +
 #      configuration prompts + PM2 start.
 #
-# Why no .git delegation: GitHub `xvirobotics/metabot` is a selectively-
-# cherry-picked OSS mirror that lags the GitLab monorepo, and most internal
-# users lack GitLab SSH credentials. Always pulling tarball makes the refresh
-# story uniform across fresh installs, GitHub clones, and GitLab clones —
-# nobody silently runs stale code, nobody needs SSH keys.
+# Why no .git delegation: package installs are immutable release artifacts.
+# Always pulling the tarball keeps package refresh independent from source
+# checkout credentials and branch state.
 #
-# Refresh model: same as /cli/latest.tgz — always-latest, pinned by atomic
-# publish. Re-run the one-liner to refresh; regular `metabot update` reroutes
-# back here even if the target directory still has a preserved `.git/`.
+# Refresh model: stable latest-release asset names, pinned by atomic publish.
+# Re-run the one-liner or use `metabot update --package` to refresh.
 #
 set -euo pipefail
 
@@ -47,7 +45,7 @@ error()   { echo -e "${RED}[bootstrap]${NC} $*" >&2; }
 success() { echo -e "${GREEN}[bootstrap]${NC} $*"; }
 
 echo ""
-echo -e "${CYAN}  MetaBot bootstrap (internal tarball install)${NC}"
+echo -e "${CYAN}  MetaBot bootstrap (release package install)${NC}"
 echo ""
 
 # ----- 1. parse flags (only --dir / -d; everything else is forwarded) -----
@@ -97,26 +95,25 @@ for cmd in curl tar; do
 done
 
 # ----- 4. heads-up if we're overlaying onto an existing git checkout -----
-# We do NOT delegate to its install.sh — that would `git pull` from a stale
-# GitHub mirror (and even on a GitLab clone, we want a uniform tarball
-# refresh story regardless of remote). `.git/` is excluded from the tarball
-# so it's left intact; `git pull` still works manually for anyone who wants it.
+# We do NOT delegate to its install.sh because package refresh is independent
+# from the checkout's remote and branch state. `.git/` is excluded from the
+# tarball, so it remains available for an explicit `metabot update --git`.
 if [[ -d "$METABOT_HOME/.git" ]]; then
   info "Existing .git/ at $METABOT_HOME left intact — tarball will overlay code only."
 fi
 
 # ----- 5. download + extract tarball (always) -----
 CORE_URL="${METABOT_CORE_URL:-http://localhost:9200}"
-TARBALL_URL="$CORE_URL/install/latest.tgz"
+TARBALL_URL="${METABOT_PACKAGE_TARBALL_URL:-$CORE_URL/install/latest.tgz}"
 TMPDIR_BOOT="$(mktemp -d -t metabot-install.XXXXXX)"
 trap 'rm -rf "$TMPDIR_BOOT"' EXIT
 TARBALL_PATH="$TMPDIR_BOOT/metabot.tgz"
 
 info "Downloading $TARBALL_URL"
 if ! curl -fsSL "$TARBALL_URL" -o "$TARBALL_PATH"; then
-  error "Download failed. Is metabot-core reachable at this URL?"
+  error "Download failed. Is the release package reachable at this URL?"
   error "  URL: $TARBALL_URL"
-  error "  Override host with: METABOT_CORE_URL=https://… curl … | bash"
+  error "  Override with: METABOT_PACKAGE_TARBALL_URL=https://… curl … | bash"
   exit 1
 fi
 
@@ -150,8 +147,8 @@ if [[ -f "$PACKAGE_DEFAULT_ENV" ]]; then
   mkdir -p "$HOME/.metabot"
   cp "$PACKAGE_DEFAULT_ENV" "$HOME/.metabot/default.env"
   chmod 600 "$HOME/.metabot/default.env"
-  rm -rf "$METABOT_HOME/.metabot-package"
-  success "Installed internal default env at $HOME/.metabot/default.env"
+  rm -f "$PACKAGE_DEFAULT_ENV"
+  success "Installed packaged default env at $HOME/.metabot/default.env"
 fi
 
 if [[ ! -f "$METABOT_HOME/install.sh" ]]; then
