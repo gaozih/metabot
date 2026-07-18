@@ -503,6 +503,22 @@ def http_json(url, token=None, timeout=4):
     except Exception as e:
         return {"ok": False, "status": None, "json": None, "bodyPreview": str(e)}
 
+def channel_summary(status_json):
+    if not isinstance(status_json, dict):
+        return None
+    channels = status_json.get("channels")
+    if not isinstance(channels, dict):
+        return None
+    items = channels.get("items") if isinstance(channels.get("items"), list) else []
+    return {
+        "total": int(channels.get("total") or 0),
+        "connected": int(channels.get("connected") or 0),
+        "reconnecting": int(channels.get("reconnecting") or 0),
+        "idle": int(channels.get("idle") or 0),
+        "failed": int(channels.get("failed") or 0),
+        "items": items,
+    }
+
 def check(name, ok, code=None, diagnosis="", recommendedAction="", canAutoFix=False, data=None):
     severity = "ok" if ok else "warn"
     item = {
@@ -582,6 +598,16 @@ check("bridge_health", bridge_health["ok"], "bridge_health_failed" if not bridge
       "Check PM2 status, API_PORT/API_SECRET, and logs/error.log.",
       False,
       {"url": metabot_url, "status": bridge_health["status"], "response": bridge_health["json"] or bridge_health["bodyPreview"]})
+
+bridge_status = http_json(f"{metabot_url.rstrip('/')}/api/status", api_secret)
+channels = channel_summary(bridge_status["json"])
+channels_ok = bool(channels is not None) and channels["failed"] == 0 and channels["reconnecting"] == 0 and channels["connected"] == channels["total"]
+check("channel_connections", channels_ok,
+      "ok" if channels_ok else ("channel_connections_unhealthy" if channels is not None else "channel_status_unavailable"),
+      "Lark/Feishu channel connections are healthy." if channels_ok else "One or more Lark/Feishu channels are disconnected, reconnecting, or unavailable.",
+      "Check the local network/proxy and configured Lark/Feishu WebSocket state in /api/status; MetaBot should reconnect automatically.",
+      False,
+      channels or {"status": bridge_status["status"]})
 
 core_url = env("METABOT_CORE_URL", "http://localhost:9200").rstrip("/")
 core_token_present = bool(env("METABOT_CORE_TOKEN") or (Path.home() / ".metabot-core" / "token").exists())
@@ -744,7 +770,9 @@ check("teamclaude", team_ok, "teamclaude_not_configured_or_invalid" if not team_
       False,
       team_data)
 
-report["ok"] = all(c.get("ok") for c in checks if c["name"] in ("metabot_home", "pm2_runtime", "bridge_health"))
+report["ok"] = all(c.get("ok") for c in checks if c["name"] in (
+    "metabot_home", "pm2_runtime", "bridge_health", "channel_connections"
+))
 report["summary"] = {
     "ok": sum(1 for c in checks if c["ok"]),
     "warn": sum(1 for c in checks if not c["ok"]),

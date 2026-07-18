@@ -13,6 +13,8 @@
 | `API_SECRET` | — | Bearer Token 认证 |
 | `LOG_LEVEL` | `info` | 日志级别（debug, info, warn, error） |
 | `METABOT_LOCAL_ADDRESS` | — | 所有飞书 socket（REST + wss 长连接）绑定到该本机源 IP，触发 source-based routing 绕过 VPN 智能分流（如某些企业 VPN 把 `*.feishu.cn` 劫持进失效隧道）。不设则走默认路由 |
+| `METABOT_FEISHU_WS_PING_TIMEOUT_SEC` | `20` | 飞书 WebSocket 的 Pong 看门狗，安全范围 5–300 秒 |
+| `METABOT_FEISHU_WS_HANDSHAKE_TIMEOUT_MS` | `15000` | 飞书 WebSocket 建连/重连握手超时，安全范围 1000–120000 毫秒 |
 
 ## Claude Code
 

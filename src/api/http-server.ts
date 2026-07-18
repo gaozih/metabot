@@ -4,7 +4,7 @@ import type * as lark from '@larksuiteoapi/node-sdk';
 import type { Logger } from '../utils/logger.js';
 import { loadAppConfig } from '../config.js';
 import type { AgentTeamConfig } from '../agent-teams/team-store.js';
-import type { BotRegistry } from './bot-registry.js';
+import type { BotChannelStatus, BotRegistry } from './bot-registry.js';
 import type { TaskScheduler } from '../scheduler/task-scheduler.js';
 import type { DocSync } from '../sync/doc-sync.js';
 import type { PeerManager } from './peer-manager.js';
@@ -65,6 +65,19 @@ const startTime = Date.now();
 (globalThis as any).__metabot_start_time = startTime;
 
 const WHOAMI_VERIFY_TIMEOUT_MS = 5_000;
+
+export function summarizeChannelStatuses(channelStatuses: BotChannelStatus[]) {
+  return {
+    total: channelStatuses.length,
+    connected: channelStatuses.filter((channel) => channel.state === 'connected').length,
+    reconnecting: channelStatuses.filter(
+      (channel) => channel.state === 'connecting' || channel.state === 'reconnecting',
+    ).length,
+    idle: channelStatuses.filter((channel) => channel.state === 'idle').length,
+    failed: channelStatuses.filter((channel) => channel.state === 'failed').length,
+    items: channelStatuses,
+  };
+}
 
 /**
  * Routes that accept the dual-auth gate: local secret OR a Bearer that
@@ -319,6 +332,7 @@ export function startApiServer(options: ApiServerOptions): http.Server {
       // gated by the auth check above (local secret or cross-verified Bearer).
       if (method === 'GET' && url === '/api/status') {
         const peerStatuses = peerManager?.getPeerStatuses() ?? [];
+        const channelStatuses = registry.listChannelStatuses();
 
         // Process memory (MB). rss = total resident set, heapUsed = V8 heap in use.
         const mem = process.memoryUsage();
@@ -350,6 +364,7 @@ export function startApiServer(options: ApiServerOptions): http.Server {
           recurringTasks: scheduler.recurringTaskCount(),
           memory: { rssMb: toMb(mem.rss), heapUsedMb: toMb(mem.heapUsed) },
           executors: { total: executorTotal, active: executorActive },
+          channels: summarizeChannelStatuses(channelStatuses),
           rateLimit: { trackedIps: rateLimiter.size() },
         });
         return;

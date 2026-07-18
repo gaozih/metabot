@@ -87,6 +87,10 @@ describe('metabot doctor command', () => {
 
   it('checks Codex agent feature readiness', () => {
     const source = fs.readFileSync(METABOT_BIN, 'utf-8');
+    expect(source).toContain('def channel_summary(status_json):');
+    expect(source).toContain('check("channel_connections"');
+    expect(source).toContain('"ok" if channels_ok else');
+    expect(source).toContain('"bridge_health", "channel_connections"');
     expect(source).toContain('parse_codex_feature_list');
     expect(source).toContain('codex_agent_features');
     expect(source).toContain('"multi_agent"');
