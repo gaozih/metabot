@@ -78,6 +78,7 @@ export class CommandHandler {
           '`/resume` - List & switch to a previous Claude session (Claude only)',
           '`/resume <id>` - Resume a session directly by id prefix',
           '`/memory` - Memory document commands',
+          '`@Bot /group-reply mention|all|status` - Feishu group reply mode (scoped to this Agent and group)',
           '`/help` - Show this help message',
           '',
           '**Agent Commands:**',
