@@ -1,6 +1,6 @@
 {
   "name": "metabot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "metabotEdition": "personal",
   "description": "MetaBot — Bridge service connecting IM bots (Feishu/Lark, Telegram) to Claude Code Agent SDK",
   "main": "dist/index.js",

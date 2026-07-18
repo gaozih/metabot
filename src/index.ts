@@ -4,6 +4,7 @@ import * as lark from '@larksuiteoapi/node-sdk';
 import { loadAppConfig, type BotConfig } from './config.js';
 import { createLogger, type Logger } from './utils/logger.js';
 import { createEventDispatcher } from './feishu/event-handler.js';
+import { FeishuGroupReplyModeStore } from './feishu/group-reply-mode-store.js';
 import { MessageSender } from './feishu/message-sender.js';
 import { FeishuSenderAdapter } from './feishu/feishu-sender-adapter.js';
 import { resolveFeishuWsRecoveryOptions } from './feishu/ws-recovery.js';
@@ -66,7 +67,12 @@ function setupFeishuLocalAddress(logger: Logger): https.Agent | undefined {
   return agent;
 }
 
-async function startFeishuBot(botConfig: BotConfig, logger: Logger, localAgent?: https.Agent): Promise<FeishuBotHandle> {
+async function startFeishuBot(
+  botConfig: BotConfig,
+  logger: Logger,
+  groupReplyModeStore: FeishuGroupReplyModeStore,
+  localAgent?: https.Agent,
+): Promise<FeishuBotHandle> {
   const botLogger = logger.child({ bot: botConfig.name });
 
   botLogger.info('Starting Feishu bot...');
@@ -113,6 +119,8 @@ async function startFeishuBot(botConfig: BotConfig, logger: Logger, localAgent?:
         botLogger.error({ err, event }, 'Unhandled error in card action handler');
       });
     },
+    groupReplyModeStore,
+    (chatId, title, content, color) => sender.sendTextNotice(chatId, title, content, color),
   );
 
   // Create WebSocket client with bounded liveness/reconnect controls.
@@ -218,13 +226,17 @@ async function main() {
   // Must run before ANY lark.Client makes a request (token fetches included)
   // so no Feishu socket ever goes out the default route.
   const feishuLocalAgent = setupFeishuLocalAddress(logger);
+  // Avoid creating Feishu-specific state for Telegram/WeChat/Web-only installs.
+  const groupReplyModeStore = feishuCount > 0
+    ? new FeishuGroupReplyModeStore(logger)
+    : undefined;
 
   // Start bots independently so a single platform/API timeout does not
   // take down the whole MetaBot process.
   const feishuHandles = feishuCount > 0
     ? await startBotsSafely(
       appConfig.feishuBots,
-      (bot) => startFeishuBot(bot, logger, feishuLocalAgent),
+      (bot) => startFeishuBot(bot, logger, groupReplyModeStore!, feishuLocalAgent),
       logger,
       'feishu',
     )
@@ -420,6 +432,7 @@ async function main() {
       Promise.allSettled(teardowns),
       new Promise((resolve) => setTimeout(resolve, 15_000)),
     ]);
+    groupReplyModeStore?.close();
     process.exit(0);
   };
 
