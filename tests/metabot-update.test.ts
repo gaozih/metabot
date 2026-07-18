@@ -68,6 +68,10 @@ describe('metabot update source selection', () => {
     expect(source).toContain('metabot update --git');
     expect(source).toContain('metabot update --package');
     expect(source).toContain('exec "$METABOT_HOME/bin/metabot" update --git');
+    expect(source).toContain("require('./package.json').metabotEdition");
+    expect(source).toContain('npm run build -w @xvirobotics/metabot-core-server');
+    expect(source).toContain('npm run build -w @xvirobotics/metabot-core-web-ui');
+    expect(source).toContain('pm2 restart metabot-core --update-env');
   });
 });
 

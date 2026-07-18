@@ -363,29 +363,54 @@ else
 fi
 success "MetaBot code ready at ${METABOT_HOME}"
 
+# GitHub Releases ship the complete self-hosted personal edition. Private or
+# legacy bridge packages retain the smaller four-workspace layout.
+PERSONAL_EDITION_PACKAGE=false
+PACKAGE_MANIFEST="$METABOT_HOME/.metabot-package/manifest.json"
+if node -e '
+  const fs = require("node:fs");
+  const [manifestPath, packagePath] = process.argv.slice(1);
+  let personal;
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    personal = manifest.package === "metabot-personal-edition" && manifest.includesCore === true;
+  } else {
+    const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+    personal = pkg.metabotEdition === "personal";
+  }
+  process.exit(personal ? 0 : 1);
+' "$PACKAGE_MANIFEST" "$METABOT_HOME/package.json"; then
+  PERSONAL_EDITION_PACKAGE=true
+  success "Personal edition package detected (Bridge + Core + Web UI)"
+fi
+
 # ============================================================================
 # Phase 3: Install dependencies
 # ============================================================================
 step "Phase 3: Installing dependencies"
 
 cd "$METABOT_HOME"
-# Bridge hosts only need:
+# Private bridge hosts only need:
 #   - root bridge runtime + devDeps (tsx for PM2, tsc for build, vitest)
 #   - @xvirobotics/cli + cli-core + metamemory + skill-hub (the four thin CLI
 #     workspaces — @xvirobotics/cli depends on the other three)
-# The heavy workspaces — @xvirobotics/metabot-core-server (better-sqlite3) and
-# @xvirobotics/metabot-core-web-ui (react, react-dom, react-router-dom, …) —
-# run on the central ECS, not bot hosts. Excluding them here keeps deployed
-# bot installs lean and avoids the better-sqlite3 native rebuild on hosts
-# that never query the central DB.
-info "Running npm install (bridge runtime + CLI workspaces; server/web-ui excluded)..."
-npm install --include=dev \
-  --workspace=@xvirobotics/cli \
-  --workspace=@xvirobotics/cli-core \
-  --workspace=@xvirobotics/metamemory \
-  --workspace=@xvirobotics/skill-hub \
-  --include-workspace-root
-success "npm dependencies installed (CLI workspaces, no server/web-ui)"
+# The Core workspaces — @xvirobotics/metabot-core-server (better-sqlite3) and
+# @xvirobotics/metabot-core-web-ui (React/Vite) — are included for the public
+# personal edition and excluded only from the legacy/private bridge flavor.
+if [[ "$PERSONAL_EDITION_PACKAGE" == "true" ]]; then
+  info "Running npm install for the complete personal edition..."
+  npm install --include=dev
+  success "npm dependencies installed (Bridge + Core + Web UI)"
+else
+  info "Running npm install (bridge runtime + CLI workspaces; server/web-ui excluded)..."
+  npm install --include=dev \
+    --workspace=@xvirobotics/cli \
+    --workspace=@xvirobotics/cli-core \
+    --workspace=@xvirobotics/metamemory \
+    --workspace=@xvirobotics/skill-hub \
+    --include-workspace-root
+  success "npm dependencies installed (CLI workspaces, no server/web-ui)"
+fi
 
 # Helper: npm install -g with sudo fallback
 npm_install_global() {
@@ -519,6 +544,127 @@ install_kimi_cli() {
   warn "Kimi CLI install failed. Install manually: uv tool install kimi-cli"
   return 1
 }
+
+# Build and start the local personal Core before interactive configuration so
+# a fresh install can securely wire its one-time token into the bridge config.
+PERSONAL_LOCAL_CORE=false
+start_personal_core() {
+  local configured_url=""
+  local token_from_env_file=""
+  local health_ok=false
+  local data_dir="$HOME/.metabot-core/data"
+  local token_file="$HOME/.metabot-core/token"
+  local bootstrap_token_file="$data_dir/admin-bootstrap-token.txt"
+
+  if [[ -f "$METABOT_HOME/.env" ]]; then
+    configured_url="$(sed -n 's/^[[:space:]]*METABOT_CORE_URL=//p' "$METABOT_HOME/.env" | tail -1 | tr -d '\r')"
+    token_from_env_file="$(sed -n 's/^[[:space:]]*METABOT_CORE_TOKEN=//p' "$METABOT_HOME/.env" | tail -1 | tr -d '\r')"
+  fi
+  configured_url="${METABOT_CORE_URL:-$configured_url}"
+
+  if [[ "${METABOT_INSTALL_CORE:-1}" == "0" ]]; then
+    info "METABOT_INSTALL_CORE=0 — keeping external Core configuration"
+    return 0
+  fi
+  case "$configured_url" in
+    ""|http://localhost:9200|http://127.0.0.1:9200) ;;
+    *)
+      info "Existing external metabot-core preserved: $configured_url"
+      return 0
+      ;;
+  esac
+
+  PERSONAL_LOCAL_CORE=true
+  export METABOT_CORE_URL="${configured_url:-http://localhost:9200}"
+  mkdir -p "$data_dir" "$HOME/.metabot-core/logs"
+  chmod 700 "$HOME/.metabot-core" "$data_dir" 2>/dev/null || true
+
+  info "Building local metabot-core server..."
+  npm run build -w @xvirobotics/metabot-core-server
+  info "Building local token-authenticated Web UI..."
+  npm run build -w @xvirobotics/metabot-core-web-ui
+
+  if pm2 describe metabot-core &>/dev/null 2>&1; then
+    local existing_core_cwd=""
+    existing_core_cwd="$(pm2 jlist 2>/dev/null | node -e '
+      let raw = "";
+      process.stdin.on("data", (chunk) => { raw += chunk; });
+      process.stdin.on("end", () => {
+        try {
+          const proc = JSON.parse(raw).find((entry) => entry.name === "metabot-core");
+          process.stdout.write(proc?.pm2_env?.pm_cwd || "");
+        } catch { process.exit(2); }
+      });
+    ')"
+    if [[ -z "$existing_core_cwd" || "$existing_core_cwd" != "$METABOT_HOME" ]]; then
+      error "Refusing to replace an existing metabot-core owned by another installation."
+      error "Existing cwd: ${existing_core_cwd:-unknown}; requested cwd: $METABOT_HOME"
+      exit 1
+    fi
+    info "Removing old metabot-core PM2 process..."
+    pm2 delete metabot-core 2>/dev/null || true
+  fi
+  info "Starting local metabot-core on http://localhost:9200..."
+  METABOT_CORE_DATA_DIR="$data_dir" pm2 start ecosystem.core.config.cjs --only metabot-core
+
+  for _ in $(seq 1 30); do
+    if node -e "fetch('http://127.0.0.1:9200/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+      health_ok=true
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$health_ok" != "true" ]]; then
+    error "Local metabot-core did not become healthy on port 9200."
+    error "Inspect: pm2 logs metabot-core --lines 50"
+    exit 1
+  fi
+
+  if [[ -n "${METABOT_CORE_TOKEN:-}" ]]; then
+    : # Explicit caller configuration wins.
+  elif [[ -n "$token_from_env_file" ]]; then
+    export METABOT_CORE_TOKEN="$token_from_env_file"
+  elif [[ -s "$token_file" ]]; then
+    METABOT_CORE_TOKEN="$(head -n 1 "$token_file" | tr -d '\r\n')"
+    export METABOT_CORE_TOKEN
+  elif [[ -s "$bootstrap_token_file" ]]; then
+    mkdir -p "$(dirname "$token_file")"
+    cp "$bootstrap_token_file" "$token_file"
+    chmod 600 "$token_file"
+    METABOT_CORE_TOKEN="$(head -n 1 "$token_file" | tr -d '\r\n')"
+    export METABOT_CORE_TOKEN
+    success "Local Core token saved to $token_file (mode 600)"
+  else
+    error "Local metabot-core is healthy but no usable token file was found."
+    exit 1
+  fi
+
+  if ! METABOT_CORE_TOKEN="$METABOT_CORE_TOKEN" node -e '
+    const token = process.env.METABOT_CORE_TOKEN;
+    Promise.all([
+      fetch("http://127.0.0.1:9200/api/agents", { headers: { Authorization: `Bearer ${token}` } }),
+      fetch("http://127.0.0.1:9200/"),
+    ]).then(async ([api, ui]) => {
+      const html = await ui.text();
+      process.exit(api.ok && ui.ok && /<html/i.test(html) ? 0 : 1);
+    }).catch(() => process.exit(1));
+  '; then
+    error "Local Core failed its authenticated API or Web UI smoke check."
+    exit 1
+  fi
+
+  if [[ -f "$METABOT_HOME/.env" && -z "$token_from_env_file" ]]; then
+    printf '\n# Local personal-edition Core token (also stored in ~/.metabot-core/token)\nMETABOT_CORE_TOKEN=%s\n' \
+      "$METABOT_CORE_TOKEN" >> "$METABOT_HOME/.env"
+    chmod 600 "$METABOT_HOME/.env"
+  fi
+
+  success "Local metabot-core is healthy; Web UI: http://localhost:9200"
+}
+
+if [[ "$PERSONAL_EDITION_PACKAGE" == "true" ]]; then
+  start_personal_core
+fi
 
 # ============================================================================
 # Phase 4: Interactive configuration
@@ -728,17 +874,27 @@ API_TIMEOUT_MS=600000"
   # ------ 4e: self-hosted metabot-core service ------
   echo ""
   echo -e "${BOLD}self-hosted metabot-core service:${NC}"
-  echo "  MetaBot delegates MetaMemory / Skill Hub / Agents / T5T to your"
-  echo "  metabot-core service (local by default)."
-  prompt_input METABOT_CORE_URL "metabot-core URL" "http://localhost:9200"
+  if [[ "$PERSONAL_LOCAL_CORE" == "true" ]]; then
+    METABOT_CORE_URL="${METABOT_CORE_URL:-http://localhost:9200}"
+    info "Local Core and Web UI are already running at $METABOT_CORE_URL"
+    info "The installer saved the Bearer token without printing it."
+  else
+    echo "  MetaBot delegates MetaMemory / Skill Hub / Agents / T5T to your"
+    echo "  metabot-core service (local by default)."
+    prompt_input METABOT_CORE_URL "metabot-core URL" "${METABOT_CORE_URL:-http://localhost:9200}"
 
-  echo ""
-  info "Get your personal Bearer token:"
-  info "  - first launch writes ~/.metabot-core/data/admin-bootstrap-token.txt"
-  info "  - paste that token into the browser console or save it as ~/.metabot-core/token"
-  info "  Paste the mt_... token below — or press Enter to configure later"
-  info "     (later: drop it into ${METABOT_HOME}/.env or ~/.metabot-core/token)"
-  prompt_secret METABOT_CORE_TOKEN "metabot-core Bearer token (blank = skip)"
+    echo ""
+    if [[ -n "${METABOT_CORE_TOKEN:-}" ]]; then
+      info "Using METABOT_CORE_TOKEN supplied by the environment (value not printed)."
+    else
+      info "Get your personal Bearer token:"
+      info "  - first launch writes ~/.metabot-core/data/admin-bootstrap-token.txt"
+      info "  - paste that token into the browser console or save it as ~/.metabot-core/token"
+      info "  Paste the mt_... token below — or press Enter to configure later"
+      info "     (later: drop it into ${METABOT_HOME}/.env or ~/.metabot-core/token)"
+      prompt_secret METABOT_CORE_TOKEN "metabot-core Bearer token (blank = skip)"
+    fi
+  fi
 fi
 
 # ============================================================================
@@ -1291,6 +1447,10 @@ echo -e "  ${BOLD}metabot-core:${NC}    ${CORE_URL_DISPLAY}"
 echo ""
 echo -e "  ${BOLD}Commands:${NC}"
 echo "    pm2 logs metabot          # View MetaBot logs"
+if [[ "$PERSONAL_LOCAL_CORE" == "true" ]]; then
+  echo "    pm2 logs metabot-core     # View local Core logs"
+  echo "    open http://localhost:9200 # Personal Web UI (or use your browser)"
+fi
 echo "    pm2 restart metabot       # Restart MetaBot"
 echo "    pm2 stop metabot          # Stop MetaBot"
 echo "    metabot memory list       # Browse central memory (delegated to metabot-core)"

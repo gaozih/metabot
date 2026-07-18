@@ -43,10 +43,9 @@ the app credentials supplied by the self-host owner.
 
 - Replace the remaining browser SSO redirects and self-service SSO token flow
   with local Bearer-token login and sign-out.
-- Close the distribution gap: the GitHub runtime installer currently ships the
-  bridge but not a runnable local MetaBot Core/Web UI. Add a separate core
-  release asset or an explicit combined personal-edition installer before the
-  browser console is advertised as installed by the one-liner.
+- [Done] Close the distribution gap with a combined GitHub personal-edition
+  package: local Core, token-only Web UI, Bridge, CLI, checksum verification,
+  bootstrap-token wiring, and an extracted-package startup smoke.
 - Port channel recovery after network changes (`14821a6`), doctor channel
   status (`460620f`), and repeated steer-card completion (`0b4eec1`).
 - Review current community PRs for webhook deduplication, output persistence,

@@ -48,7 +48,7 @@
 curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
 ```
 
-The installer walks you through everything: working directory → **engine choice (Claude / Kimi / Codex)** → subscription login → IM platform → auto-start with PM2. **5 minutes to get started.**
+The installer deploys the complete personal edition (local Core + Web UI + Bridge + CLI), generates and stores the local Bearer token without printing it, then walks you through: working directory → **engine choice (Claude / Kimi / Codex)** → subscription login → IM platform → auto-start with PM2. The console is available at `http://localhost:9200`. **5 minutes to get started.**
 
 > Custom install directory (default `~/metabot`): clone into the directory you want, or `METABOT_HOME=/opt/metabot bash install.sh`. Windows: `.\install.ps1 -Dir C:\opt\metabot`.
 >
@@ -175,7 +175,7 @@ metabot/                       # repo root — bridge runtime (bot hosts run thi
 └── docs/                      # all docs
 ```
 
-The two halves communicate **only over HTTP `/api/*`** — cross-package imports are blocked by ESLint `no-restricted-imports` plus a tight `packages/server/package.json` exports lock. A bot-host `install.sh` installs only the bridge + CLI/CLI-Core dependency closure — server-only deps (fastify / react / vite / server-side better-sqlite3) are **not** pulled. Central-server deployment still uses `cd packages/server && bash deploy/install.sh` (the script uses `$PKG_DIR` and is unaffected by the source-path move).
+The two halves communicate **only over HTTP `/api/*`** — cross-package imports are blocked by ESLint `no-restricted-imports` plus a tight `packages/server/package.json` exports lock. Public GitHub Releases and source `install.sh` now install the complete personal-edition closure and run `metabot-core` (9200) and `metabot` (9100) as separate PM2 apps. Set `METABOT_INSTALL_CORE=0` to keep an external Core. The standalone server systemd path remains available via `cd packages/server && sudo bash deploy/install.sh`.
 
 | Client | Use Case | Key Features |
 |--------|----------|-------------|

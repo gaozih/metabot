@@ -14,11 +14,13 @@
     irm https://raw.githubusercontent.com/xvirobotics/metabot/main/install.ps1 | iex
     ```
 
-安装器引导：工作目录 → Claude 认证 → IM 凭证 → PM2 自动启动。
+Linux/macOS 安装器会验证 GitHub Release 校验和，安装完整个人版（本地 Core + Web UI + Bridge + CLI），把首次 Token 以 `0600` 权限保存到 `~/.metabot-core/token`，再引导完成引擎认证和 IM 凭证。控制台地址为 `http://localhost:9200`。
+
+如需连接已有外部 Core，请设置 `METABOT_INSTALL_CORE=0`，并提供 `METABOT_CORE_URL` / `METABOT_CORE_TOKEN`。
 
 ## 更新
 
-已安装？一条命令下载最新内网安装包、构建、更新 skills、重启：
+已安装？一条命令下载最新公开个人版安装包、构建、更新 skills、重启：
 
 ```bash
 metabot update
@@ -56,3 +58,5 @@ npm run dev
 ## Windows 说明
 
 PowerShell 安装器自动检测 `winget`/`choco`/`scoop` 来安装 Node.js。`metabot` CLI 通过 `.cmd` 包装器安装，需要 [Git for Windows](https://git-scm.com)（提供 Git Bash）。
+
+完整本地 Core/Web UI 生命周期目前由 Linux/macOS 的带校验和 Bash Release 安装器提供；Windows `install.ps1` 在补齐 Core 生命周期前仍只安装 Bridge。

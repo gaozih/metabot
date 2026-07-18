@@ -10,6 +10,7 @@ OUTPUT_DIR="${METABOT_GITHUB_RELEASE_OUTPUT_DIR:-$REPO_ROOT/dist/github-release}
 PACK_SCRIPT="$REPO_ROOT/packages/server/scripts/pack-metabot.sh"
 TMP_DIR="$(mktemp -d -t metabot-github-release.XXXXXX)"
 GITHUB_TARBALL_URL="https://github.com/xvirobotics/metabot/releases/latest/download/metabot-runtime.tgz"
+GITHUB_CHECKSUMS_URL="https://github.com/xvirobotics/metabot/releases/latest/download/SHA256SUMS"
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -19,17 +20,24 @@ trap cleanup EXIT
 mkdir -p "$OUTPUT_DIR"
 rm -f "$OUTPUT_DIR/metabot-runtime.tgz.new" "$OUTPUT_DIR/install.sh.new" "$OUTPUT_DIR/SHA256SUMS.new"
 
-METABOT_PACK_OUTPUT_DIR="$TMP_DIR" bash "$PACK_SCRIPT"
+# Public releases are the complete self-hosted personal edition. Fail closed
+# if an internal default-env injection leaks into the caller environment.
+if [[ -n "${METABOT_PACKAGE_DEFAULT_ENV_FILE:-}" || -n "${METABOT_INTERNAL_DEFAULT_ENV_FILE:-}" ]]; then
+  echo "error: public GitHub packages may not embed default env files" >&2
+  exit 1
+fi
+METABOT_PACKAGE_FLAVOR=personal METABOT_PACK_OUTPUT_DIR="$TMP_DIR" bash "$PACK_SCRIPT"
 
 cp "$TMP_DIR/latest.tgz" "$OUTPUT_DIR/metabot-runtime.tgz.new"
 
 # The shared bootstrap retains the legacy core URL for private mirrors. The
 # GitHub asset injects a public default while preserving an explicit caller
 # override via METABOT_PACKAGE_TARBALL_URL.
-awk -v url="$GITHUB_TARBALL_URL" '
+awk -v url="$GITHUB_TARBALL_URL" -v checksums="$GITHUB_CHECKSUMS_URL" '
   NR == 1 {
     print
     print "export METABOT_PACKAGE_TARBALL_URL=\"${METABOT_PACKAGE_TARBALL_URL:-" url "}\""
+    print "export METABOT_PACKAGE_CHECKSUMS_URL=\"${METABOT_PACKAGE_CHECKSUMS_URL:-" checksums "}\""
     next
   }
   { print }

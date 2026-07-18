@@ -14,11 +14,13 @@
     irm https://raw.githubusercontent.com/xvirobotics/metabot/main/install.ps1 | iex
     ```
 
-The installer walks you through: working directory → Claude auth → IM credentials → auto-start with PM2.
+The Linux/macOS installer verifies the GitHub Release checksum, installs the complete personal edition (local Core + Web UI + Bridge + CLI), stores the bootstrap token at `~/.metabot-core/token` with mode `0600`, then walks you through engine authentication and IM credentials. The local console is `http://localhost:9200`.
+
+To connect the Bridge to an existing external Core instead, run with `METABOT_INSTALL_CORE=0` and provide `METABOT_CORE_URL` / `METABOT_CORE_TOKEN`.
 
 ## Update
 
-Already installed? One command downloads the latest internal package, rebuilds, updates skills, and restarts:
+Already installed? One command downloads the latest public personal-edition package, rebuilds, updates skills, and restarts:
 
 ```bash
 metabot update
@@ -56,3 +58,5 @@ npm run dev
 ## Windows Notes
 
 The PowerShell installer auto-detects `winget`/`choco`/`scoop` for Node.js installation. The `metabot` CLI is installed with a `.cmd` wrapper and requires [Git for Windows](https://git-scm.com) (provides Git Bash).
+
+The complete local Core/Web UI lifecycle is currently provided by the signed-checksum Bash Release installer on Linux/macOS. Windows `install.ps1` remains a Bridge installer until its Core lifecycle reaches parity.

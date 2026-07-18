@@ -38,7 +38,8 @@ export interface ServerOptions {
    * If set, GET requests whose Host header matches this value fall through to
    * static file serving from `packages/server/static/` (SPA Web UI). Other
    * Host values continue to behave as a pure API server (404 for non-API
-   * paths). Default unset → SPA serving is disabled entirely.
+   * paths). Default unset serves the SPA on any Host; the server still binds
+   * to 127.0.0.1 by default, so a fresh personal install remains local-only.
    */
   uiHost?: string;
   /**
@@ -496,8 +497,7 @@ export function startServer(options: ServerOptions): ServerHandle {
   const tokenFile = path.join(dataDir, 'admin-bootstrap-token.txt');
   const bootstrapToken = credentialsStore.bootstrapAdmin(tokenFile);
   if (bootstrapToken) {
-    logger.warn({ tokenFile }, 'ADMIN TOKEN BOOTSTRAPPED — SAVE IT NOW; this is the only time it is displayed');
-    logger.warn({ token: bootstrapToken }, 'metabot-core admin token (one-time)');
+    logger.warn({ tokenFile }, 'ADMIN TOKEN BOOTSTRAPPED — stored in the protected token file; token value is not logged');
   }
 
   const startedAt = Date.now();
@@ -637,7 +637,7 @@ export function startServer(options: ServerOptions): ServerHandle {
     // /health and /api/manifest stay accessible on the UI host (handled below).
     const uiHost = options.uiHost;
     const reqHost = (req.headers.host || '').split(':')[0].toLowerCase();
-    const isUiHost = !!uiHost && reqHost === uiHost;
+    const isUiHost = !uiHost || reqHost === uiHost;
 
     if (
       isUiHost
