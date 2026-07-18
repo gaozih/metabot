@@ -45,15 +45,14 @@
 </div>
 
 ```bash
-git clone https://github.com/xvirobotics/metabot.git ~/metabot
-cd ~/metabot && bash install.sh
+curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
 ```
 
 安装器引导一切：工作目录 → **引擎选择（Claude / Kimi / Codex）** → 订阅登录 → IM 平台 → PM2 自动启动。**5 分钟上手。**
 
 > 自定义安装目录（默认 `~/metabot`）：把 `~/metabot` 换成你想要的路径即可，或 `METABOT_HOME=/opt/metabot bash install.sh`。Windows: `.\install.ps1 -Dir C:\opt\metabot`。
 >
-> 也可以一行直装：`curl -fsSL https://raw.githubusercontent.com/xvirobotics/metabot/main/install.sh | bash`。
+> 源码开发安装：`git clone https://github.com/xvirobotics/metabot.git ~/metabot && cd ~/metabot && bash install.sh`。Release 安装与源码 checkout 使用不同更新路径，`metabot update` 会自动识别。
 
 ---
 

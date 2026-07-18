@@ -52,7 +52,7 @@ _load_bridge_api_config() {
 _json() { python3 -m json.tool 2>/dev/null || cat; }
 
 cmd_update() {
-  local update_source="${METABOT_UPDATE_SOURCE:-package}"
+  local update_source="${METABOT_UPDATE_SOURCE:-auto}"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --git)
@@ -71,27 +71,35 @@ cmd_update() {
     esac
   done
 
+  if [[ "$update_source" == "auto" ]]; then
+    if [[ -f "$METABOT_HOME/.metabot-package/manifest.json" ]]; then
+      update_source="package"
+    elif [[ -d "$METABOT_HOME/.git" ]]; then
+      update_source="git"
+    else
+      update_source="package"
+    fi
+  fi
+
   if [[ "$update_source" != "git" ]]; then
-    # Company-default refresh path: re-run the metabot-core bootstrap, which
-    # downloads /install/latest.tgz and overlays the bot-host runtime. This is
-    # intentionally used even when .git exists, so GitHub/GitLab credentials are
-    # not part of the normal user update story. Developers can opt into the old
-    # source checkout workflow with `metabot update --git`.
+    # Package installs refresh from the stable GitHub Release installer asset.
+    # METABOT_UPDATE_INSTALLER_URL allows mirrors without coupling OSS installs
+    # to an internal metabot-core endpoint.
     if [[ -f "$METABOT_HOME/install.sh" || -d "$METABOT_HOME" ]]; then
-      local core_url="${METABOT_CORE_URL:-http://localhost:9200}"
-      info "Refreshing MetaBot from internal package at $core_url/install/latest.tgz"
-      exec bash -c 'curl -fsSL "$1/install/install.sh" | METABOT_HOME="$2" bash' bash "$core_url" "$METABOT_HOME"
+      local installer_url="${METABOT_UPDATE_INSTALLER_URL:-https://github.com/xvirobotics/metabot/releases/latest/download/install.sh}"
+      info "Refreshing MetaBot from GitHub Release package"
+      exec bash -c 'curl -fsSL "$1" | METABOT_HOME="$2" bash' bash "$installer_url" "$METABOT_HOME"
     fi
     error "MetaBot not found at $METABOT_HOME"
     echo "  Run the installer first:"
-    echo "    curl -fsSL http://localhost:9200/install/install.sh | bash"
+    echo "    curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash"
     exit 1
   fi
 
   if [[ ! -d "$METABOT_HOME/.git" ]]; then
     error "Git update requested, but $METABOT_HOME is not a git checkout."
-    echo "  Use the default package refresh instead:"
-    echo "    metabot update"
+    echo "  Use the release package refresh instead:"
+    echo "    metabot update --package"
     exit 1
   fi
 
@@ -118,8 +126,9 @@ cmd_update() {
   info "Installing dependencies..."
   npm install --production=false
 
-  info "Building..."
-  npm run build
+  info "Building bridge and metabot CLI..."
+  npm run build:bridge
+  npm run build -w @xvirobotics/cli
 
   # Update CLI tools in ~/.local/bin.
   # `metabot` is the sole dispatcher (bridge process control + delegate to
@@ -1510,8 +1519,9 @@ print_help() {
   echo -e "${BOLD}metabot${NC} - MetaBot CLI"
   echo ""
   echo "  Process control:"
-  echo "    metabot update        Refresh from internal package, rebuild, and restart"
-  echo "    metabot update --git  Developer-only: git pull, rebuild, and restart"
+  echo "    metabot update            Auto: git checkout pulls; package install downloads release"
+  echo "    metabot update --package  Refresh from the latest GitHub Release package"
+  echo "    metabot update --git      Git pull, rebuild, and restart"
   echo "    metabot start      Start MetaBot with PM2"
   echo "    metabot stop       Stop MetaBot"
   echo "    metabot restart    Restart MetaBot"

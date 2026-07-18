@@ -7,7 +7,7 @@
 #
 # What ships in the tarball:
 #   - bin/, install.sh, ecosystem.config.cjs, tsconfig*.json
-#   - package.json + package-lock.json (root workspace manifests)
+#   - package.json + package-lock.json (runtime-only workspace manifest)
 #   - src/                              (engine + workspace skill sources)
 #   - packages/cli, cli-core, metamemory, skill-hub  (4 bot-host workspaces)
 #   - packages/skills/metabot           (Phase 6 SKILL_SENTINEL)
@@ -38,7 +38,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SERVER_PKG_DIR/../.." && pwd)"
-SERVER_STATIC_DIR="$SERVER_PKG_DIR/static/install"
+SERVER_STATIC_DIR="${METABOT_PACK_OUTPUT_DIR:-$SERVER_PKG_DIR/static/install}"
 BOOTSTRAP_SRC="$SERVER_PKG_DIR/install/bootstrap.sh"
 PACKAGE_DEFAULT_ENV_FILE="${METABOT_PACKAGE_DEFAULT_ENV_FILE:-${METABOT_INTERNAL_DEFAULT_ENV_FILE:-}}"
 
@@ -46,6 +46,7 @@ TARBALL_NAME="latest.tgz"
 BOOTSTRAP_NAME="install.sh"
 
 VERSION="$(node -e "process.stdout.write(require('$REPO_ROOT/package.json').version)")"
+RELEASE_VERSION="${METABOT_RELEASE_VERSION:-$VERSION}"
 
 # Patterns excluded from every recursive include. Mirrors what rsync staging
 # used to skip; tar applies these globally regardless of which include path
@@ -71,9 +72,7 @@ INCLUDES=(
   'bin'
   'install.sh'
   'ecosystem.config.cjs'
-  'package.json'
   'package-lock.json'
-  'tsconfig.json'
   'tsconfig.bridge.json'
   'src'
   'packages/cli'
@@ -110,12 +109,9 @@ done
 
 mkdir -p "$SERVER_STATIC_DIR"
 
-EXTRA_TAR_ARGS=()
-TMP_EXTRA_DIR=""
+TMP_EXTRA_DIR="$(mktemp -d -t metabot-pack-extra.XXXXXX)"
 cleanup() {
-  if [[ -n "$TMP_EXTRA_DIR" ]]; then
-    rm -rf "$TMP_EXTRA_DIR"
-  fi
+  rm -rf "$TMP_EXTRA_DIR"
 }
 trap cleanup EXIT
 
@@ -124,12 +120,63 @@ if [[ -n "$PACKAGE_DEFAULT_ENV_FILE" ]]; then
     echo "error: METABOT_PACKAGE_DEFAULT_ENV_FILE does not exist: $PACKAGE_DEFAULT_ENV_FILE" >&2
     exit 1
   fi
-  TMP_EXTRA_DIR="$(mktemp -d -t metabot-pack-extra.XXXXXX)"
   mkdir -p "$TMP_EXTRA_DIR/.metabot-package"
   cp "$PACKAGE_DEFAULT_ENV_FILE" "$TMP_EXTRA_DIR/.metabot-package/default.env"
   chmod 600 "$TMP_EXTRA_DIR/.metabot-package/default.env"
   EXTRA_TAR_ARGS=(-C "$TMP_EXTRA_DIR" '.metabot-package/default.env')
   echo "==> Embedding packaged default env from $PACKAGE_DEFAULT_ENV_FILE"
+fi
+
+echo "==> Writing runtime-only package manifests"
+node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/package.json" "$RELEASE_VERSION" <<'NODE'
+const fs = require('node:fs');
+const [src, dest, releaseVersion] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(src, 'utf8'));
+pkg.version = releaseVersion;
+pkg.workspaces = [
+  'packages/cli',
+  'packages/cli-core',
+  'packages/metamemory',
+  'packages/skill-hub',
+];
+pkg.scripts = {
+  ...pkg.scripts,
+  build: 'npm run build:bridge',
+  'build:packages': 'npm run build --workspaces --if-present',
+  test: 'vitest run',
+};
+delete pkg.scripts['build:web'];
+fs.writeFileSync(dest, `${JSON.stringify(pkg, null, 2)}\n`);
+NODE
+
+node - "$REPO_ROOT/tsconfig.json" "$TMP_EXTRA_DIR/tsconfig.json" <<'NODE'
+const fs = require('node:fs');
+const [src, dest] = process.argv.slice(2);
+const tsconfig = JSON.parse(fs.readFileSync(src, 'utf8'));
+tsconfig.references = (tsconfig.references || []).filter((ref) =>
+  !['./packages/server', './packages/web-ui'].includes(ref.path),
+);
+fs.writeFileSync(dest, `${JSON.stringify(tsconfig, null, 2)}\n`);
+NODE
+
+mkdir -p "$TMP_EXTRA_DIR/.metabot-package"
+node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/.metabot-package/manifest.json" "$RELEASE_VERSION" <<'NODE'
+const fs = require('node:fs');
+const [pkgPath, dest, releaseVersion] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+const manifest = {
+  schemaVersion: 1,
+  package: 'metabot-runtime',
+  version: releaseVersion,
+  sourcePackageVersion: pkg.version,
+  channel: 'install',
+};
+fs.writeFileSync(dest, `${JSON.stringify(manifest, null, 2)}\n`);
+NODE
+
+EXTRA_TAR_ARGS=(-C "$TMP_EXTRA_DIR" 'package.json' 'tsconfig.json' '.metabot-package/manifest.json')
+if [[ -f "$TMP_EXTRA_DIR/.metabot-package/default.env" ]]; then
+  EXTRA_TAR_ARGS+=(-C "$TMP_EXTRA_DIR" '.metabot-package/default.env')
 fi
 
 echo "==> Writing $SERVER_STATIC_DIR/$TARBALL_NAME (atomic)"
@@ -177,4 +224,4 @@ chmod +x "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME.new"
 mv "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME.new" "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME"
 
 SIZE="$(ls -lh "$SERVER_STATIC_DIR/$TARBALL_NAME" | awk '{print $5}')"
-echo "==> Done. metabot bot-host runtime v$VERSION → $SERVER_STATIC_DIR/$TARBALL_NAME ($SIZE)"
+echo "==> Done. metabot bot-host runtime v$RELEASE_VERSION → $SERVER_STATIC_DIR/$TARBALL_NAME ($SIZE)"

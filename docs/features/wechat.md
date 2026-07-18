@@ -18,7 +18,7 @@ MetaBot supports WeChat personal accounts via the ClawBot plugin (iLink Bot API)
 Run the installer and pick `3) WeChat ClawBot` as the IM platform:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xvirobotics/metabot/main/install.sh | bash
+curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
 ```
 
 The installer will:

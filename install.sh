@@ -1193,8 +1193,24 @@ step "Phase 8: Starting MetaBot"
 
 cd "$METABOT_HOME"
 
-info "Building TypeScript..."
-npm run build 2>/dev/null && success "Build complete" || warn "Build failed, will use tsx directly via PM2"
+info "Building bridge TypeScript..."
+if npm run build:bridge; then
+  success "Bridge build complete"
+else
+  error "Bridge build failed. MetaBot was not started."
+  exit 1
+fi
+
+# The metabot shell command delegates memory/t5t/skills/agents to
+# packages/cli/dist/index.js. Release tarballs intentionally contain source,
+# not dist/, so a successful install must build this workspace explicitly.
+info "Building metabot CLI..."
+if npm run build -w @xvirobotics/cli; then
+  success "CLI build complete"
+else
+  error "CLI build failed. MetaBot was not started."
+  exit 1
+fi
 
 # Always delete + start fresh to avoid stale/stopped process issues
 if pm2 describe metabot &>/dev/null 2>&1; then

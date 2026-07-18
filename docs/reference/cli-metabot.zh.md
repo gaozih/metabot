@@ -17,8 +17,9 @@ MetaBot 安装器自动安装到 `~/.local/bin/metabot`。
 ## 1. bridge 进程控制
 
 ```bash
-metabot update                      # 内网 package refresh，重新构建，更新 skills，重启
-metabot update --git                # 开发者专用：git pull + 构建 + 重启
+metabot update                      # 自动选择 GitHub Release 或源码 checkout 更新
+metabot update --package            # 强制使用最新 GitHub Release 包
+metabot update --git                # 强制 git pull + 构建 + 重启
 metabot start                       # 启动（PM2）
 metabot stop                        # 停止
 metabot restart                     # 重启
@@ -28,15 +29,15 @@ metabot status                      # PM2 进程状态
 
 `metabot update` 是推荐的更新方式。它依次执行：
 
-1. 从 `METABOT_CORE_URL/install/latest.tgz` 下载当前内网安装包
+1. 从 GitHub Releases 下载最新公开 runtime 包
 2. 覆盖代码文件，保留 `.env`、`bots.json`、`logs/`、`data/` 和 `.git/`
-3. `npm install && npm run build` — 重新构建
+3. 安装依赖，然后分别构建 bridge 与委托使用的 MetaBot CLI
 4. 复制 MetaBot 内置 skills 到 Claude/Codex skill 目录
 5. 如果本机已安装 `lark-cli` 或 lark skills，自动更新 `@larksuite/cli` 并刷新 lark AI Agent skills
 6. 同步 skills 到已配置的 bot 工作目录
 7. `pm2 restart` — 重启服务
 
-一条命令搞定。源码 checkout 仍可使用 `metabot update --git`，但这是开发者路径，需要干净的 Git remote。
+一条命令搞定。Package 安装使用稳定的 GitHub Release assets，源码 checkout 使用 `git pull`；可用 `METABOT_UPDATE_INSTALLER_URL` 覆盖 package 镜像地址。
 
 ## 2. bridge 守护进程 API
 

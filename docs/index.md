@@ -43,7 +43,7 @@ Each bot picks its engine in `bots.json`. Frontend bot on Claude, backend bot on
 === "Linux / macOS"
 
     ```bash
-    curl -fsSL https://raw.githubusercontent.com/xvirobotics/metabot/main/install.sh | bash
+    curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/install.sh | bash
     ```
 
 === "Windows (PowerShell)"
