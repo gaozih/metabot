@@ -90,6 +90,7 @@ describe('pack-metabot.sh', () => {
     const pkg = JSON.parse(packageJson);
     expect(pkg.scripts.build).toBe('npm run build:bridge');
     expect(pkg.scripts['build:web']).toBeUndefined();
+    expect(pkg.metabotEdition).toBeUndefined();
     expect(pkg.workspaces).toEqual(['packages/cli', 'packages/cli-core', 'packages/metamemory', 'packages/skill-hub']);
 
     const tsconfigJson = execSync(`tar xOf ${JSON.stringify(TARBALL_PATH)} tsconfig.json`, { encoding: 'utf-8' });

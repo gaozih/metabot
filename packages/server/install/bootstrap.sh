@@ -105,6 +105,7 @@ fi
 # ----- 5. download + extract tarball (always) -----
 CORE_URL="${METABOT_CORE_URL:-http://localhost:9200}"
 TARBALL_URL="${METABOT_PACKAGE_TARBALL_URL:-$CORE_URL/install/latest.tgz}"
+CHECKSUMS_URL="${METABOT_PACKAGE_CHECKSUMS_URL:-}"
 TMPDIR_BOOT="$(mktemp -d -t metabot-install.XXXXXX)"
 trap 'rm -rf "$TMPDIR_BOOT"' EXIT
 TARBALL_PATH="$TMPDIR_BOOT/metabot.tgz"
@@ -126,6 +127,30 @@ if ! tar -tzf "$TARBALL_PATH" >/dev/null 2>&1; then
   head -c 200 "$TARBALL_PATH" >&2
   echo "" >&2
   exit 1
+fi
+
+if [[ -n "$CHECKSUMS_URL" ]]; then
+  CHECKSUMS_PATH="$TMPDIR_BOOT/SHA256SUMS"
+  info "Verifying release checksum"
+  if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_PATH"; then
+    error "Checksum download failed: $CHECKSUMS_URL"
+    exit 1
+  fi
+  EXPECTED_SHA256="$(awk '$2 == "metabot-runtime.tgz" { print $1; exit }' "$CHECKSUMS_PATH")"
+  if [[ ! "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+    error "SHA256SUMS does not contain a valid metabot-runtime.tgz entry"
+    exit 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL_SHA256="$(sha256sum "$TARBALL_PATH" | awk '{print $1}')"
+  else
+    ACTUAL_SHA256="$(shasum -a 256 "$TARBALL_PATH" | awk '{print $1}')"
+  fi
+  if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
+    error "Release checksum mismatch; refusing to extract"
+    exit 1
+  fi
+  success "Release checksum verified"
 fi
 
 mkdir -p "$METABOT_HOME"

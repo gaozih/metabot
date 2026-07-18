@@ -31,6 +31,8 @@ describe('GitHub release package', () => {
   it('points the public installer at GitHub Releases instead of localhost core', () => {
     const source = fs.readFileSync(INSTALLER, 'utf-8');
     expect(source).toContain('https://github.com/xvirobotics/metabot/releases/latest/download/metabot-runtime.tgz');
+    expect(source).toContain('https://github.com/xvirobotics/metabot/releases/latest/download/SHA256SUMS');
+    expect(source).toContain('Release checksum mismatch; refusing to extract');
     expect(source).not.toContain('TARBALL_URL="$CORE_URL/install/latest.tgz"');
   });
 
@@ -40,5 +42,52 @@ describe('GitHub release package', () => {
     for (const workspace of packageJson.workspaces as string[]) {
       expect(listing).toContain(`${workspace}/package.json`);
     }
+  });
+
+  it('ships the complete self-hosted personal edition', () => {
+    const listing = execSync(`tar tzf ${JSON.stringify(TARBALL)}`, { encoding: 'utf-8' });
+    expect(listing).toContain('ecosystem.core.config.cjs');
+    expect(listing).toContain('packages/server/package.json');
+    expect(listing).toContain('packages/web-ui/package.json');
+    expect(listing).not.toContain('packages/server/static/');
+
+    const manifest = JSON.parse(execSync(
+      `tar xOf ${JSON.stringify(TARBALL)} .metabot-package/manifest.json`,
+      { encoding: 'utf-8' },
+    ));
+    expect(manifest).toMatchObject({
+      package: 'metabot-personal-edition',
+      includesCore: true,
+      includesWebUi: true,
+    });
+
+    const packageJson = JSON.parse(execSync(
+      `tar xOf ${JSON.stringify(TARBALL)} package.json`,
+      { encoding: 'utf-8' },
+    ));
+    expect(packageJson.workspaces).toContain('packages/server');
+    expect(packageJson.workspaces).toContain('packages/web-ui');
+    expect(packageJson.metabotEdition).toBe('personal');
+  });
+
+  it('installs, builds, and starts local Core without printing the token', () => {
+    const source = execSync(`tar xOf ${JSON.stringify(TARBALL)} install.sh`, { encoding: 'utf-8' });
+    expect(source).toContain('PERSONAL_EDITION_PACKAGE=true');
+    expect(source).toContain('npm run build -w @xvirobotics/metabot-core-server');
+    expect(source).toContain('npm run build -w @xvirobotics/metabot-core-web-ui');
+    expect(source).toContain('pm2 start ecosystem.core.config.cjs --only metabot-core');
+    expect(source).toContain('Local Core token saved to $token_file (mode 600)');
+    expect(source).not.toContain('echo "$METABOT_CORE_TOKEN"');
+  });
+
+  it('fails closed when public packaging is asked to embed a default env', () => {
+    expect(() => execFileSync('bash', [SCRIPT], {
+      env: {
+        ...process.env,
+        METABOT_GITHUB_RELEASE_OUTPUT_DIR: OUT_DIR,
+        METABOT_PACKAGE_DEFAULT_ENV_FILE: '/tmp/should-never-be-read',
+      },
+      stdio: 'pipe',
+    })).toThrow();
   });
 });

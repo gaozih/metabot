@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pack the metabot bot-host runtime into a tarball + publish the bootstrap
+# Pack the metabot runtime into a tarball + publish the bootstrap
 # installer script. Output lands under `packages/server/static/install/`,
 # which is published to the server's static dir at install time.
 # The tarball + script are served anonymously at
@@ -13,8 +13,13 @@
 #   - packages/skills/metabot           (Phase 6 SKILL_SENTINEL)
 #   - packages/skills/metabot-team      (Agent Teams CLI skill)
 #
-# What does NOT ship (central-only / build artifacts / user state):
+# What does NOT ship in the default bridge flavor (central-only):
 #   - packages/server, packages/web-ui
+#
+# The public GitHub Release sets METABOT_PACKAGE_FLAVOR=personal. That flavor
+# adds the local Core server + Web UI sources so the same one-line installer
+# produces a complete self-hosted personal edition instead of a bridge that
+# points at a Core service the user does not have.
 #   - node_modules, dist, *.tsbuildinfo, coverage
 #   - .git, .github, .codex
 #   - .env, bots.json, logs/, data/   (never committed — naturally absent)
@@ -41,6 +46,15 @@ REPO_ROOT="$(cd "$SERVER_PKG_DIR/../.." && pwd)"
 SERVER_STATIC_DIR="${METABOT_PACK_OUTPUT_DIR:-$SERVER_PKG_DIR/static/install}"
 BOOTSTRAP_SRC="$SERVER_PKG_DIR/install/bootstrap.sh"
 PACKAGE_DEFAULT_ENV_FILE="${METABOT_PACKAGE_DEFAULT_ENV_FILE:-${METABOT_INTERNAL_DEFAULT_ENV_FILE:-}}"
+PACKAGE_FLAVOR="${METABOT_PACKAGE_FLAVOR:-bridge}"
+
+case "$PACKAGE_FLAVOR" in
+  bridge|personal) ;;
+  *)
+    echo "error: unsupported METABOT_PACKAGE_FLAVOR: $PACKAGE_FLAVOR" >&2
+    exit 1
+    ;;
+esac
 
 TARBALL_NAME="latest.tgz"
 BOOTSTRAP_NAME="install.sh"
@@ -59,6 +73,7 @@ TAR_EXCLUDES=(
   '--exclude=dist'
   '--exclude=*.tsbuildinfo'
   '--exclude=coverage'
+  '--exclude=packages/server/static'
   '--exclude=.DS_Store'
   '--exclude=*.log'
 )
@@ -84,6 +99,14 @@ INCLUDES=(
   'LICENSE'
   'README.md'
 )
+
+if [[ "$PACKAGE_FLAVOR" == "personal" ]]; then
+  INCLUDES+=(
+    'ecosystem.core.config.cjs'
+    'packages/server'
+    'packages/web-ui'
+  )
+fi
 
 # Filter to paths that actually exist. tar would error on a missing positional
 # argument, and a missing optional file (e.g. LICENSE not yet checked in)
@@ -127,49 +150,56 @@ if [[ -n "$PACKAGE_DEFAULT_ENV_FILE" ]]; then
   echo "==> Embedding packaged default env from $PACKAGE_DEFAULT_ENV_FILE"
 fi
 
-echo "==> Writing runtime-only package manifests"
-node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/package.json" "$RELEASE_VERSION" <<'NODE'
+echo "==> Writing $PACKAGE_FLAVOR package manifests"
+node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/package.json" "$RELEASE_VERSION" "$PACKAGE_FLAVOR" <<'NODE'
 const fs = require('node:fs');
-const [src, dest, releaseVersion] = process.argv.slice(2);
+const [src, dest, releaseVersion, flavor] = process.argv.slice(2);
 const pkg = JSON.parse(fs.readFileSync(src, 'utf8'));
 pkg.version = releaseVersion;
-pkg.workspaces = [
-  'packages/cli',
-  'packages/cli-core',
-  'packages/metamemory',
-  'packages/skill-hub',
-];
-pkg.scripts = {
-  ...pkg.scripts,
-  build: 'npm run build:bridge',
-  'build:packages': 'npm run build --workspaces --if-present',
-  test: 'vitest run',
-};
-delete pkg.scripts['build:web'];
+if (flavor === 'bridge') {
+  delete pkg.metabotEdition;
+  pkg.workspaces = [
+    'packages/cli',
+    'packages/cli-core',
+    'packages/metamemory',
+    'packages/skill-hub',
+  ];
+  pkg.scripts = {
+    ...pkg.scripts,
+    build: 'npm run build:bridge',
+    'build:packages': 'npm run build --workspaces --if-present',
+    test: 'vitest run',
+  };
+  delete pkg.scripts['build:web'];
+}
 fs.writeFileSync(dest, `${JSON.stringify(pkg, null, 2)}\n`);
 NODE
 
-node - "$REPO_ROOT/tsconfig.json" "$TMP_EXTRA_DIR/tsconfig.json" <<'NODE'
+node - "$REPO_ROOT/tsconfig.json" "$TMP_EXTRA_DIR/tsconfig.json" "$PACKAGE_FLAVOR" <<'NODE'
 const fs = require('node:fs');
-const [src, dest] = process.argv.slice(2);
+const [src, dest, flavor] = process.argv.slice(2);
 const tsconfig = JSON.parse(fs.readFileSync(src, 'utf8'));
-tsconfig.references = (tsconfig.references || []).filter((ref) =>
-  !['./packages/server', './packages/web-ui'].includes(ref.path),
-);
+if (flavor === 'bridge') {
+  tsconfig.references = (tsconfig.references || []).filter((ref) =>
+    !['./packages/server', './packages/web-ui'].includes(ref.path),
+  );
+}
 fs.writeFileSync(dest, `${JSON.stringify(tsconfig, null, 2)}\n`);
 NODE
 
 mkdir -p "$TMP_EXTRA_DIR/.metabot-package"
-node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/.metabot-package/manifest.json" "$RELEASE_VERSION" <<'NODE'
+node - "$REPO_ROOT/package.json" "$TMP_EXTRA_DIR/.metabot-package/manifest.json" "$RELEASE_VERSION" "$PACKAGE_FLAVOR" <<'NODE'
 const fs = require('node:fs');
-const [pkgPath, dest, releaseVersion] = process.argv.slice(2);
+const [pkgPath, dest, releaseVersion, flavor] = process.argv.slice(2);
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const manifest = {
   schemaVersion: 1,
-  package: 'metabot-runtime',
+  package: flavor === 'personal' ? 'metabot-personal-edition' : 'metabot-runtime',
   version: releaseVersion,
   sourcePackageVersion: pkg.version,
   channel: 'install',
+  includesCore: flavor === 'personal',
+  includesWebUi: flavor === 'personal',
 };
 fs.writeFileSync(dest, `${JSON.stringify(manifest, null, 2)}\n`);
 NODE
@@ -211,6 +241,11 @@ if ! grep -Eq '^(\./)?packages/skills/metabot-team/SKILL\.md$' <<<"$TARBALL_LIST
   rm -f "$SERVER_STATIC_DIR/$TARBALL_NAME.new"
   exit 1
 fi
+if [[ "$PACKAGE_FLAVOR" == "personal" ]] && grep -Eq '^(\./)?packages/server/static(/|$)' <<<"$TARBALL_LISTING"; then
+  echo "error: personal package contains prebuilt/stale packages/server/static content" >&2
+  rm -f "$SERVER_STATIC_DIR/$TARBALL_NAME.new"
+  exit 1
+fi
 
 mv "$SERVER_STATIC_DIR/$TARBALL_NAME.new" "$SERVER_STATIC_DIR/$TARBALL_NAME"
 
@@ -224,4 +259,4 @@ chmod +x "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME.new"
 mv "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME.new" "$SERVER_STATIC_DIR/$BOOTSTRAP_NAME"
 
 SIZE="$(ls -lh "$SERVER_STATIC_DIR/$TARBALL_NAME" | awk '{print $5}')"
-echo "==> Done. metabot bot-host runtime v$RELEASE_VERSION → $SERVER_STATIC_DIR/$TARBALL_NAME ($SIZE)"
+echo "==> Done. metabot $PACKAGE_FLAVOR package v$RELEASE_VERSION → $SERVER_STATIC_DIR/$TARBALL_NAME ($SIZE)"
