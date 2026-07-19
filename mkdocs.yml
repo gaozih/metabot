@@ -1,12 +1,13 @@
 site_name: MetaBot
 site_url: https://xvirobotics.com/metabot
-site_description: 构建受监督的、自我进化的 Agent 组织的基础设施
+site_description: MetaBot Personal Edition — a self-hosted Core Console for Codex, Kimi Code and Claude Code, reachable from Web, Feishu/Lark, Telegram and WeChat.
 repo_url: https://github.com/xvirobotics/metabot
 repo_name: xvirobotics/metabot
 edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     - scheme: slate
       primary: blue
