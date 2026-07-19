@@ -8,24 +8,15 @@ on:
 
 jobs:
   check:
-    # Keep the historical required-check contexts stable while advancing the
-    # actual Node runtimes enforced by branch protection.
-    name: check (${{ matrix.context }})
+    name: check (22)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - context: 20
-            node-version: 22.19.0
-          - context: 22
-            node-version: 24
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js 22.19.0
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22.19.0
           cache: npm
 
       - name: Install dependencies

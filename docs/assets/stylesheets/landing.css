@@ -35,6 +35,12 @@
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 
+  /* Keep Material's generic heading/code rules stable inside the always-dark
+     landing canvas when the documentation palette is toggled. */
+  --md-default-fg-color--light: rgba(226, 228, 233, 0.56);
+  --md-code-bg-color: #272a35;
+  --md-code-fg-color: rgba(213, 216, 226, 0.82);
+
   position: relative;
   overflow: clip;
   background: var(--ink-000);
@@ -857,8 +863,8 @@ html.js .mb-copy { display: inline-flex; }
 }
 
 /* ---------- site chrome: dark header + tabs (landing only) ----------
-   These rules live in landing.css, which home.html loads only on the
-   root index pages, so inner docs pages keep the stock Material look.
+   These rules live in landing.css, which home.html loads after the global
+   docs theme on root index pages, so the landing remains the final override.
    Colors are literals because the header/tabs sit outside .mb-landing,
    where the palette custom properties are scoped. Layout, sticky
    behavior and structure stay untouched — colors and hairlines only. */
