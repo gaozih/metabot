@@ -82,8 +82,8 @@ function buildHandler(opts: BuildOpts = {}) {
   const config = {
     name: 'test-bot',
     claude: { model: 'claude-opus-4-6' },
-    kimi: { model: 'kimi-for-coding' },
-    codex: { model: 'gpt-5.5', displayModel: 'gpt-5.5' },
+    kimi: { model: 'kimi-code/k3' },
+    codex: { model: 'gpt-5.6', displayModel: 'gpt-5.6' },
   } as any;
 
   const handler = new CommandHandler(
@@ -170,7 +170,7 @@ describe('CommandHandler /status', () => {
   it('shows default model when no session model is set', async () => {
     const { handler, notices } = buildHandler({});
     await handler.handle(msg('/status'));
-    expect(notices[0].content).toContain('gpt-5.5');
+    expect(notices[0].content).toContain('gpt-5.6');
   });
 });
 
@@ -184,7 +184,7 @@ describe('CommandHandler /model', () => {
     const handled = await handler.handle(msg('/model'));
     expect(handled).toBe(true);
     expect(notices[0].title).toContain('Model');
-    expect(notices[0].content).toContain('gpt-5.5');
+    expect(notices[0].content).toContain('gpt-5.6');
   });
 
   it('lists claude models on /model list when engine is claude', async () => {
@@ -198,20 +198,24 @@ describe('CommandHandler /model', () => {
   it('lists kimi models on /model list when engine is kimi', async () => {
     const { handler, notices } = buildHandler({ engine: 'kimi' });
     await handler.handle(msg('/model list'));
-    expect(notices[0].content).toContain('kimi-for-coding');
-    expect(notices[0].content).toContain('kimi-k2');
+    expect(notices[0].content).toContain('kimi-code/k3');
+    expect(notices[0].content).toContain('kimi-code/kimi-for-coding-highspeed');
   });
 
   it('lists codex models on /model list when engine is codex', async () => {
     const { handler, notices } = buildHandler({ engine: 'codex' });
     await handler.handle(msg('/model list'));
+    expect(notices[0].content).toContain('gpt-5.6');
+    expect(notices[0].content).toContain('gpt-5.6-terra');
+    expect(notices[0].content).toContain('gpt-5.6-luna');
     expect(notices[0].content).toContain('gpt-5.5');
+    expect(notices[0].content).toContain('gpt-5.5-codex');
   });
 
   it('accepts /model ls as alias for list', async () => {
     const { handler, notices } = buildHandler({});
     await handler.handle(msg('/model ls'));
-    expect(notices[0].content).toContain('gpt-5.5');
+    expect(notices[0].content).toContain('gpt-5.6');
   });
 
   it('switches engine to kimi on /model kimi', async () => {
@@ -293,6 +297,8 @@ describe('CommandHandler /effort', () => {
     await handler.handle(msg('/effort'));
     expect(notices[0].title).toContain('Effort');
     expect(notices[0].content).toContain('codex');
+    expect(notices[0].content).toContain('/effort max');
+    expect(notices[0].content).toContain('/effort ultra');
   });
 
   it('sets Codex effort for the current session', async () => {
@@ -302,10 +308,16 @@ describe('CommandHandler /effort', () => {
     expect(notices[0].color).toBe('green');
   });
 
-  it('accepts max as an alias for xhigh', async () => {
+  it('keeps max as a distinct Codex effort', async () => {
     const { handler, getReasoningEffort } = buildHandler({});
     await handler.handle(msg('/effort max'));
-    expect(getReasoningEffort()).toBe('xhigh');
+    expect(getReasoningEffort()).toBe('max');
+  });
+
+  it('keeps ultra as a distinct Codex effort', async () => {
+    const { handler, getReasoningEffort } = buildHandler({});
+    await handler.handle(msg('/effort ultra'));
+    expect(getReasoningEffort()).toBe('ultra');
   });
 
   it('refuses effort changes when the active engine is not Codex', async () => {

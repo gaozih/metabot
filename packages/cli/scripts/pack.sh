@@ -45,12 +45,12 @@ if [[ ! -x "$ESBUILD_BIN" ]]; then
   exit 1
 fi
 
-echo "==> Bundling CLI with esbuild (target=node20, format=esm)"
+echo "==> Bundling CLI with esbuild (target=node22, format=esm)"
 "$ESBUILD_BIN" \
   "$CLI_PKG_DIR/scripts/standalone-entry.ts" \
   --bundle \
   --platform=node \
-  --target=node20 \
+  --target=node22 \
   --format=esm \
   --banner:js='#!/usr/bin/env node' \
   --outfile="$STAGE_DIR/bundle.mjs" \

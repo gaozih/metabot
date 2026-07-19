@@ -64,7 +64,7 @@ export function CliAccess() {
             <pre className="env-block">{installCmd}</pre>
             <div className="cli-access-meta" style={{ marginBottom: 12 }}>
               <span style={{ color: 'var(--bone-300)', fontSize: 11 }}>
-                The token appears in shell history. Use a protected env file when possible; Node 20+ is required.
+                The token appears in shell history. Use a protected env file when possible; Node &gt;= 22.19 is required.
               </span>
             </div>
 

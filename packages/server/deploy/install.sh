@@ -15,7 +15,7 @@
 #   - Set up TLS termination or an SSO/auth reverse proxy. Both are OPTIONAL and
 #     left to the operator (see the note printed at the end). The personal
 #     edition authenticates with a local API token out of the box.
-#   - Install Node or any system package — assumes Node 20+ is already on PATH.
+#   - Install Node or any system package — assumes Node >=22.19 is already on PATH.
 #
 # Configurable via environment:
 #   USER_NAME              run user             (default: ${SUDO_USER:-$USER})
@@ -48,7 +48,12 @@ if ! id -u "$USER_NAME" >/dev/null 2>&1; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "error: node not on PATH; install Node 20+ before running this script" >&2
+  echo "error: node not on PATH; install Node >=22.19 before running this script" >&2
+  exit 2
+fi
+
+if ! node -e 'const [a,b,c]=process.versions.node.split(".").map(Number); process.exit(a>22 || (a===22 && (b>19 || (b===19 && c>=0))) ? 0 : 1)'; then
+  echo "error: Node >=22.19 is required; found $(node --version)" >&2
   exit 2
 fi
 

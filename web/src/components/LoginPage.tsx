@@ -87,11 +87,11 @@ export function LoginPage() {
         <div className={styles.footer}>
           Powered by{' '}
           <a
-            href="https://github.com/anthropics/claude-code"
+            href="https://github.com/xvirobotics/metabot"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Claude Code Agent SDK
+            MetaBot Personal Edition · Codex · Kimi Code
           </a>
         </div>
       </div>
