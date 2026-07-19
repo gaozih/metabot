@@ -8,7 +8,8 @@ MetaBot 个人版只提供一个浏览器前端：Core Console。
 
 ## Chat
 
-Core Console 的 Chat 已合并原 Bridge Live UI 的交互体验，同时保留 Core 的持久 Conversation、Run 和多 Agent 数据模型：
+Core Console Chat 把实时执行与 Core 的持久 Conversation、Run 和多 Agent 数据模型
+放在同一页面：
 
 - 流式展示 Agent 回复和当前运行状态
 - 展示 Codex、Kimi Code 和 Claude 兼容引擎的工具活动
@@ -20,7 +21,7 @@ Core Console 的 Chat 已合并原 Bridge Live UI 的交互体验，同时保留
 - 创建 Agent 私聊或带 `@Agent` 路由的群聊
 - 为每个会话选择引擎和模型
 
-## 架构
+## 架构 {#architecture}
 
 ```text
 浏览器 :9200
@@ -31,9 +32,8 @@ Core Console 的 Chat 已合并原 Bridge Live UI 的交互体验，同时保留
                       └─ Run 状态、工具、问题和文件事件回传 Core
 ```
 
-源码位于 `packages/web-ui/`，Vite 构建产物写入 `packages/server/static/`。Bridge 不再构建或托管第二套 SPA。
-
-旧地址 `http://localhost:9100/web/` 保留为兼容重定向，自动跳转到 Core Console 的 `/chat`。
+源码位于 `packages/web-ui/`，Vite 构建产物写入 `packages/server/static/`。Bridge
+负责执行 Agent 并回传实时状态，不再提供另一套浏览器前端。
 
 ## 开发
 
