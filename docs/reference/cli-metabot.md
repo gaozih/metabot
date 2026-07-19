@@ -18,9 +18,10 @@ Installed automatically by the MetaBot installer to `~/.local/bin/metabot`.
 ## 1. Bridge process control
 
 ```bash
-metabot update                      # auto-select GitHub Release or git checkout update
-metabot update --package            # force latest GitHub Release package
-metabot update --git                # force git pull + rebuild + restart
+metabot update                                  # package install: latest GitHub Release
+metabot update --package                        # force latest GitHub Release package
+metabot update --package --version 1.2.0        # pin immutable Release v1.2.0
+metabot update --git                            # force git pull + rebuild + restart
 metabot start                       # start with PM2
 metabot stop                        # stop
 metabot restart                     # restart
@@ -28,17 +29,25 @@ metabot logs                        # view live logs (pass -n 100 etc.)
 metabot status                      # PM2 process status
 ```
 
-`metabot update` is the recommended way to update MetaBot. It performs:
+For a normal package-managed personal edition, `metabot update` defaults to the
+latest GitHub Release. A source checkout is auto-detected and keeps its Git
+update path; use `--package` to force a Release overlay.
 
-1. Download the latest public runtime package from GitHub Releases
-2. Overlay code files into `METABOT_HOME`, preserving `.env`, `bots.json`, `logs/`, `data/`, and `.git/`
-3. Install dependencies, then build the bridge and delegated MetaBot CLI
-4. Copy bundled MetaBot skills into Claude/Codex skill directories
-5. If `lark-cli` or lark skills are already installed, update `@larksuite/cli` and refresh the lark AI Agent skills
-6. Sync skills into the configured bot workspace
-7. `pm2 restart` — restart the service
+`metabot update --package --version 1.2.0` selects the immutable v1.2.0 assets
+instead of `latest`. Package updating performs:
 
-All in one command. Package installs use the stable GitHub Release assets; source checkouts use `git pull`. Override the package installer mirror with `METABOT_UPDATE_INSTALLER_URL`.
+1. Download `install.sh`, `metabot-runtime.tgz`, and `SHA256SUMS` from the latest or pinned GitHub Release.
+2. Verify the runtime SHA256 before extraction.
+3. Validate the complete personal-edition manifest and its semantic version; a pinned version must match exactly.
+4. Overlay code into `METABOT_HOME`, preserving `.env`, `bots.json`, `logs/`, `data/`, and `.git/`.
+5. Preserve user/Core state under `~/.metabot/` and `~/.metabot-core/`; only package-owned `~/.metabot/default.env` may be refreshed.
+6. Install dependencies and build the Bridge, Core, Web UI, and delegated CLI.
+7. Refresh bundled/workspace Skills and existing Lark CLI Skills when present.
+8. Restart the managed PM2 services.
+
+Override the package installer mirror with `METABOT_UPDATE_INSTALLER_URL`.
+`--version` accepts only `x.y.z` (an optional leading `v` is normalized) and
+cannot be combined with `--git`.
 
 ## 2. Bridge daemon API
 
@@ -141,12 +150,12 @@ metabot voice tts "Hello" --voice nova                   # use specific voice
 
 TTS flags:
 
-| Flag | Description |
-|------|-------------|
-| `--play` | Play audio after generating (macOS: afplay, Linux: mpv/ffplay/play) |
-| `-o FILE` | Save to specific file (default: `/tmp/metabot-voice-<timestamp>.mp3`) |
-| `--provider NAME` | TTS provider: `doubao`, `openai`, or `elevenlabs` |
-| `--voice ID` | Voice/speaker ID (provider-specific) |
+| Flag              | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `--play`          | Play audio after generating (macOS: afplay, Linux: mpv/ffplay/play)   |
+| `-o FILE`         | Save to specific file (default: `/tmp/metabot-voice-<timestamp>.mp3`) |
+| `--provider NAME` | TTS provider: `doubao`, `openai`, or `elevenlabs`                     |
+| `--voice ID`      | Voice/speaker ID (provider-specific)                                  |
 
 ## 3. metabot-core delegation
 

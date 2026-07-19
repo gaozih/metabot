@@ -18,6 +18,7 @@ describe('metabot update source selection', () => {
     const fakeBin = path.join(tmp, 'bin');
     const metabotHome = path.join(tmp, 'metabot');
     const marker = path.join(tmp, 'marker.txt');
+    const releaseEnv = path.join(tmp, 'release-env.txt');
     const curlArgs = path.join(tmp, 'curl-args.txt');
 
     fs.mkdirSync(fakeBin, { recursive: true });
@@ -37,6 +38,7 @@ describe('metabot update source selection', () => {
         "cat <<'SH'",
         '#!/usr/bin/env bash',
         'printf "package:%s\\n" "$METABOT_HOME" > "$MARKER"',
+        'printf "%s\\n%s\\n%s\\n" "$METABOT_PACKAGE_TARBALL_URL" "$METABOT_PACKAGE_CHECKSUMS_URL" "$METABOT_EXPECTED_PACKAGE_VERSION" > "$RELEASE_ENV"',
         'SH',
         '',
       ].join('\n'),
@@ -49,6 +51,7 @@ describe('metabot update source selection', () => {
         PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
         METABOT_HOME: metabotHome,
         MARKER: marker,
+        RELEASE_ENV: releaseEnv,
         CURL_ARGS_FILE: curlArgs,
       },
       stdio: 'pipe',
@@ -58,6 +61,101 @@ describe('metabot update source selection', () => {
     expect(fs.readFileSync(curlArgs, 'utf-8')).toContain(
       'https://github.com/xvirobotics/metabot/releases/latest/download/install.sh',
     );
+    expect(fs.readFileSync(releaseEnv, 'utf-8').split('\n').slice(0, 2)).toEqual([
+      'https://github.com/xvirobotics/metabot/releases/latest/download/metabot-runtime.tgz',
+      'https://github.com/xvirobotics/metabot/releases/latest/download/SHA256SUMS',
+    ]);
+  });
+
+  it('can pin an immutable GitHub Release and propagates exact asset URLs', () => {
+    const tmp = makeTempDir();
+    const fakeBin = path.join(tmp, 'bin');
+    const metabotHome = path.join(tmp, 'metabot');
+    const marker = path.join(tmp, 'marker.txt');
+    const curlArgs = path.join(tmp, 'curl-args.txt');
+
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.mkdirSync(path.join(metabotHome, '.metabot-package'), { recursive: true });
+    fs.writeFileSync(
+      path.join(metabotHome, '.metabot-package', 'manifest.json'),
+      '{"schemaVersion":1,"package":"metabot-personal-edition","version":"1.1.0"}\n',
+    );
+    fs.writeFileSync(
+      path.join(fakeBin, 'curl'),
+      [
+        '#!/usr/bin/env bash',
+        'printf "%s\\n" "$*" > "$CURL_ARGS_FILE"',
+        "cat <<'SH'",
+        '#!/usr/bin/env bash',
+        'printf "%s\\n%s\\n%s\\n" "$METABOT_PACKAGE_TARBALL_URL" "$METABOT_PACKAGE_CHECKSUMS_URL" "$METABOT_EXPECTED_PACKAGE_VERSION" > "$MARKER"',
+        'SH',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+
+    execFileSync('bash', [METABOT_BIN, 'update', '--package', '--version', '1.2.0'], {
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
+        METABOT_HOME: metabotHome,
+        MARKER: marker,
+        CURL_ARGS_FILE: curlArgs,
+      },
+      stdio: 'pipe',
+    });
+
+    expect(fs.readFileSync(marker, 'utf-8').trim().split('\n')).toEqual([
+      'https://github.com/xvirobotics/metabot/releases/download/v1.2.0/metabot-runtime.tgz',
+      'https://github.com/xvirobotics/metabot/releases/download/v1.2.0/SHA256SUMS',
+      '1.2.0',
+    ]);
+    expect(fs.readFileSync(curlArgs, 'utf-8')).toContain(
+      'https://github.com/xvirobotics/metabot/releases/download/v1.2.0/install.sh',
+    );
+  });
+
+  it('rejects invalid or git-pinned release selections before download', () => {
+    const tmp = makeTempDir();
+    const metabotHome = path.join(tmp, 'metabot');
+    fs.mkdirSync(path.join(metabotHome, '.git'), { recursive: true });
+
+    expect(() =>
+      execFileSync('bash', [METABOT_BIN, 'update', '--package', '--version', 'latest'], {
+        env: { ...process.env, METABOT_HOME: metabotHome },
+        stdio: 'pipe',
+      }),
+    ).toThrow();
+    expect(() =>
+      execFileSync('bash', [METABOT_BIN, 'update', '--git', '--version', '1.2.0'], {
+        env: { ...process.env, METABOT_HOME: metabotHome },
+        stdio: 'pipe',
+      }),
+    ).toThrow();
+  });
+
+  it('fails when the release installer download fails', () => {
+    const tmp = makeTempDir();
+    const fakeBin = path.join(tmp, 'bin');
+    const metabotHome = path.join(tmp, 'metabot');
+    fs.mkdirSync(fakeBin, { recursive: true });
+    fs.mkdirSync(path.join(metabotHome, '.metabot-package'), { recursive: true });
+    fs.writeFileSync(
+      path.join(metabotHome, '.metabot-package', 'manifest.json'),
+      '{"schemaVersion":1,"package":"metabot-personal-edition","version":"1.1.0"}\n',
+    );
+    fs.writeFileSync(path.join(fakeBin, 'curl'), '#!/usr/bin/env bash\nexit 22\n', { mode: 0o755 });
+
+    expect(() =>
+      execFileSync('bash', [METABOT_BIN, 'update', '--package'], {
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}:${process.env.PATH ?? ''}`,
+          METABOT_HOME: metabotHome,
+        },
+        stdio: 'pipe',
+      }),
+    ).toThrow();
   });
 
   it('defaults source checkouts to git and keeps explicit source overrides', () => {
@@ -67,6 +165,8 @@ describe('metabot update source selection', () => {
     expect(source).toContain('elif [[ -d "$METABOT_HOME/.git" ]]');
     expect(source).toContain('metabot update --git');
     expect(source).toContain('metabot update --package');
+    expect(source).toContain('METABOT_EXPECTED_PACKAGE_VERSION');
+    expect(source).toContain('releases/download/v${update_version}');
     expect(source).toContain('exec "$METABOT_HOME/bin/metabot" update --git');
     expect(source).toContain("require('./package.json').metabotEdition");
     expect(source).toContain('npm run build -w @xvirobotics/metabot-core-server');

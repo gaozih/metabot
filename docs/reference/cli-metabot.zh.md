@@ -17,9 +17,10 @@ MetaBot 安装器自动安装到 `~/.local/bin/metabot`。
 ## 1. bridge 进程控制
 
 ```bash
-metabot update                      # 自动选择 GitHub Release 或源码 checkout 更新
-metabot update --package            # 强制使用最新 GitHub Release 包
-metabot update --git                # 强制 git pull + 构建 + 重启
+metabot update                                  # Package 安装：最新 GitHub Release
+metabot update --package                        # 强制使用最新 GitHub Release 包
+metabot update --package --version 1.2.0        # 固定不可变 Release v1.2.0
+metabot update --git                            # 强制 git pull + 构建 + 重启
 metabot start                       # 启动（PM2）
 metabot stop                        # 停止
 metabot restart                     # 重启
@@ -27,17 +28,24 @@ metabot logs                        # 查看实时日志（可传 -n 100 等）
 metabot status                      # PM2 进程状态
 ```
 
-`metabot update` 是推荐的更新方式。它依次执行：
+普通 Package 管理的个人版执行 `metabot update` 时，默认升级到最新 GitHub
+Release。源码 checkout 会被自动识别并保留 Git 更新路径；用 `--package`
+可以强制进行 Release 覆盖。
 
-1. 从 GitHub Releases 下载最新公开 runtime 包
-2. 覆盖代码文件，保留 `.env`、`bots.json`、`logs/`、`data/` 和 `.git/`
-3. 安装依赖，然后分别构建 bridge 与委托使用的 MetaBot CLI
-4. 复制 MetaBot 内置 skills 到 Claude/Codex skill 目录
-5. 如果本机已安装 `lark-cli` 或 lark skills，自动更新 `@larksuite/cli` 并刷新 lark AI Agent skills
-6. 同步 skills 到已配置的 bot 工作目录
-7. `pm2 restart` — 重启服务
+`metabot update --package --version 1.2.0` 选择不可变 v1.2.0 资源而不是
+`latest`。Package 更新依次执行：
 
-一条命令搞定。Package 安装使用稳定的 GitHub Release assets，源码 checkout 使用 `git pull`；可用 `METABOT_UPDATE_INSTALLER_URL` 覆盖 package 镜像地址。
+1. 从最新或固定 GitHub Release 下载 `install.sh`、`metabot-runtime.tgz` 和 `SHA256SUMS`。
+2. 解压前验证 runtime SHA256。
+3. 校验完整个人版 Manifest 和语义版本；固定版本必须精确匹配。
+4. 覆盖 `METABOT_HOME` 中的代码，保留 `.env`、`bots.json`、`logs/`、`data/` 和 `.git/`。
+5. 保留 `~/.metabot/` 和 `~/.metabot-core/` 下的用户/Core 状态；只有 Package 管理的 `~/.metabot/default.env` 可能刷新。
+6. 安装依赖并构建 Bridge、Core、Web UI 和委托 CLI。
+7. 刷新内置/工作区 Skills，以及已有的 Lark CLI Skills。
+8. 重启受管理的 PM2 服务。
+
+可用 `METABOT_UPDATE_INSTALLER_URL` 覆盖 Package 镜像地址。`--version` 只接受
+`x.y.z`（可选前导 `v` 会被标准化），且不能与 `--git` 组合。
 
 ## 2. bridge 守护进程 API
 
@@ -140,12 +148,12 @@ metabot voice tts "你好" --voice nova                     # 指定声音
 
 TTS 参数：
 
-| 参数 | 说明 |
-|------|------|
-| `--play` | 生成后播放（macOS: afplay, Linux: mpv/ffplay/play） |
-| `-o FILE` | 保存到指定文件（默认: `/tmp/metabot-voice-<时间戳>.mp3`） |
-| `--provider NAME` | TTS 服务商: `doubao`、`openai`、`elevenlabs` |
-| `--voice ID` | 声音/音色 ID（各服务商不同） |
+| 参数              | 说明                                                      |
+| ----------------- | --------------------------------------------------------- |
+| `--play`          | 生成后播放（macOS: afplay, Linux: mpv/ffplay/play）       |
+| `-o FILE`         | 保存到指定文件（默认: `/tmp/metabot-voice-<时间戳>.mp3`） |
+| `--provider NAME` | TTS 服务商: `doubao`、`openai`、`elevenlabs`              |
+| `--voice ID`      | 声音/音色 ID（各服务商不同）                              |
 
 ## 3. metabot-core 转发
 

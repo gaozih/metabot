@@ -76,11 +76,23 @@ Install and run `claude login` only when an existing bot or workspace selects
 
 ## Update
 
-Package installations update from stable GitHub Release assets:
+For a normal package-managed personal edition, the default command upgrades to
+the latest GitHub Release:
 
 ```bash
 metabot update
 ```
+
+To install one immutable release instead of following `latest`:
+
+```bash
+metabot update --package --version 1.2.0
+```
+
+The pinned form downloads `install.sh`, `metabot-runtime.tgz`, and
+`SHA256SUMS` from the GitHub v1.2.0 Release. Package updates verify the runtime
+SHA256, validate the complete personal-edition manifest and semantic version,
+and fail closed if a pinned package reports a different version.
 
 Source checkouts use Git explicitly:
 
@@ -88,9 +100,12 @@ Source checkouts use Git explicitly:
 metabot update --git
 ```
 
-The updater preserves `.env`, `bots.json`, user data, logs, workspace
-instructions, and locally modified Skills. Release and source update paths are
-kept separate.
+The package overlay preserves `.env`, `bots.json`, `data/`, `logs/`, `.git/`,
+workspace instructions, and locally modified Skills. User and Core state under
+`~/.metabot/` and `~/.metabot-core/` is outside the runtime overlay and is also
+preserved. The package-owned `~/.metabot/default.env` may be refreshed with new
+safe defaults; other user-created state in that directory is not removed.
+Release and source update paths are kept separate.
 
 ## Existing External Core
 

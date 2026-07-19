@@ -86,6 +86,12 @@ if [[ "$METABOT_HOME" != /* ]]; then
 fi
 export METABOT_HOME
 
+CURRENT_PACKAGE_VERSION=""
+if [[ -f "$METABOT_HOME/.metabot-package/manifest.json" ]]; then
+  CURRENT_PACKAGE_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' \
+    "$METABOT_HOME/.metabot-package/manifest.json" | head -n 1)"
+fi
+
 # ----- 3. preflight: curl + tar are mandatory; node check is install.sh's job -----
 for cmd in curl tar; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -153,8 +159,30 @@ if [[ -n "$CHECKSUMS_URL" ]]; then
   success "Release checksum verified"
 fi
 
+PACKAGE_MANIFEST_STAGED="$TMPDIR_BOOT/manifest.json"
+if ! tar -xOf "$TARBALL_PATH" .metabot-package/manifest.json > "$PACKAGE_MANIFEST_STAGED" 2>/dev/null \
+  && ! tar -xOf "$TARBALL_PATH" ./.metabot-package/manifest.json > "$PACKAGE_MANIFEST_STAGED" 2>/dev/null; then
+  error "Release package manifest is missing or is not a complete MetaBot Personal Edition."
+  exit 1
+fi
+NEW_PACKAGE_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*\)".*/\1/p' \
+  "$PACKAGE_MANIFEST_STAGED" | head -n 1)"
+if [[ -z "$NEW_PACKAGE_VERSION" ]] \
+  || [[ ! "$NEW_PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+  || ! grep -Eq '"package"[[:space:]]*:[[:space:]]*"metabot-personal-edition"' "$PACKAGE_MANIFEST_STAGED" \
+  || ! grep -Eq '"includesCore"[[:space:]]*:[[:space:]]*true' "$PACKAGE_MANIFEST_STAGED" \
+  || ! grep -Eq '"includesWebUi"[[:space:]]*:[[:space:]]*true' "$PACKAGE_MANIFEST_STAGED"; then
+  error "Release package manifest is missing or is not a complete MetaBot Personal Edition."
+  exit 1
+fi
+if [[ -n "${METABOT_EXPECTED_PACKAGE_VERSION:-}" ]] \
+  && [[ "$NEW_PACKAGE_VERSION" != "${METABOT_EXPECTED_PACKAGE_VERSION#v}" ]]; then
+  error "Release version mismatch: expected ${METABOT_EXPECTED_PACKAGE_VERSION#v}, got $NEW_PACKAGE_VERSION"
+  exit 1
+fi
+
 mkdir -p "$METABOT_HOME"
-info "Extracting into $METABOT_HOME"
+info "Extracting Personal Edition v${NEW_PACKAGE_VERSION} into $METABOT_HOME"
 # Plain `tar xzf` overwrites tarball-tracked files in-place. We don't use
 # --keep-newer-files because the pack script stamps every entry with a fixed
 # `--mtime='UTC 2026-01-01'` for deterministic output — local files modified
@@ -166,6 +194,21 @@ info "Extracting into $METABOT_HOME"
 #   - .git/  (excluded so manual `git pull` still possible if desired)
 #   - node_modules/  (excluded; Phase 3 npm install reconciles)
 tar xzf "$TARBALL_PATH" -C "$METABOT_HOME"
+
+if [[ -n "$CURRENT_PACKAGE_VERSION" ]]; then
+  success "Personal Edition staged: v${CURRENT_PACKAGE_VERSION} → v${NEW_PACKAGE_VERSION}"
+else
+  success "Personal Edition v${NEW_PACKAGE_VERSION} staged"
+fi
+
+# v1.2.0 consolidated the historical Bridge Live UI into packages/web-ui.
+# Package overlays intentionally do not delete arbitrary files, so remove only
+# the known legacy application when its package identity proves ownership.
+if [[ -f "$METABOT_HOME/web/package.json" ]] \
+  && grep -Eq '"name"[[:space:]]*:[[:space:]]*"metabot-web"' "$METABOT_HOME/web/package.json"; then
+  rm -rf "$METABOT_HOME/web" "$METABOT_HOME/dist/web"
+  success "Removed the retired Bridge Web UI; Core Console is now the only browser frontend"
+fi
 
 PACKAGE_DEFAULT_ENV="$METABOT_HOME/.metabot-package/default.env"
 if [[ -f "$PACKAGE_DEFAULT_ENV" ]]; then
