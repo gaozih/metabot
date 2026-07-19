@@ -1,5 +1,15 @@
 # Installation
 
+## Requirements
+
+- **Node.js >= 22.19**
+- Git
+- Credentials for at least one engine and one chat channel
+- Linux/macOS for the complete signed-checksum personal-edition lifecycle
+
+Codex is the default engine. Kimi Code is a first-class alternative; Claude
+Code is an optional compatibility engine for existing workspaces.
+
 ## One-Line Install
 
 === "Linux / macOS"
@@ -14,49 +24,102 @@
     irm https://raw.githubusercontent.com/xvirobotics/metabot/main/install.ps1 | iex
     ```
 
-The Linux/macOS installer verifies the GitHub Release checksum, installs the complete personal edition (local Core + Web UI + Bridge + CLI), stores the bootstrap token at `~/.metabot-core/token` with mode `0600`, then walks you through engine authentication and IM credentials. The local console is `http://localhost:9200`.
+The Linux/macOS installer:
 
-To connect the Bridge to an existing external Core instead, run with `METABOT_INSTALL_CORE=0` and provide `METABOT_CORE_URL` / `METABOT_CORE_TOKEN`.
+1. downloads the current public GitHub Release and verifies `SHA256SUMS`;
+2. installs the local Core, token-only Web UI, Bridge, CLI, and bundled Skills;
+3. stores the generated Core token at `~/.metabot-core/token` with mode `0600`;
+4. prompts for a workspace, engine, authentication, and IM channel; and
+5. starts Core and Bridge as separate PM2 applications.
+
+The local personal console is `http://localhost:9200`. The installer does not
+print the raw token into logs. Core data is stored under `~/.metabot-core/` and
+Bridge state under `~/.metabot/` by default.
+
+To install elsewhere:
+
+```bash
+METABOT_HOME=/opt/metabot bash install.sh
+```
+
+The default directory is `~/metabot`.
+
+## Engine Authentication
+
+Run login commands from a standalone terminal.
+
+### Codex CLI (default)
+
+```bash
+npm install -g @openai/codex
+codex login
+```
+
+MetaBot's public adapter currently uses `codex exec --json` and
+`codex exec resume`. It does not require or claim Codex app-server support.
+
+### Kimi Code 0.27+
+
+```bash
+npm install -g @moonshot-ai/kimi-code@latest
+kimi login
+```
+
+MetaBot uses Kimi Code's official loopback Server API, the same frontend
+contract used by Kimi's web UI. Legacy Python `kimi-cli --wire` integrations
+are not supported by this path.
+
+### Claude Code compatibility
+
+Install and run `claude login` only when an existing bot or workspace selects
+`"engine": "claude"`.
 
 ## Update
 
-Already installed? One command downloads the latest public personal-edition package, rebuilds, updates skills, and restarts:
+Package installations update from stable GitHub Release assets:
 
 ```bash
 metabot update
 ```
 
-If `lark-cli` or Feishu/Lark skills were already installed, `metabot update` updates them too and syncs them into the bot workspace.
-
-Developer source checkouts can opt into Git-based updates with `metabot update --git`. Regular bot hosts should use the default package refresh so no Git credentials are required.
-
-## Manual Install
+Source checkouts use Git explicitly:
 
 ```bash
-git clone https://github.com/xvirobotics/metabot.git
-cd metabot && npm install
-cp bots.example.json bots.json   # edit with your bot configs
-cp .env.example .env              # edit global settings
+metabot update --git
+```
+
+The updater preserves `.env`, `bots.json`, user data, logs, workspace
+instructions, and locally modified Skills. Release and source update paths are
+kept separate.
+
+## Existing External Core
+
+To install only the Bridge and point it at an existing Core:
+
+```bash
+METABOT_INSTALL_CORE=0 bash install.sh
+```
+
+Configure `METABOT_CORE_URL` and `METABOT_CORE_TOKEN`. The installer will not
+replace a foreign Core PM2 process or its data.
+
+## Source Development Install
+
+```bash
+git clone https://github.com/xvirobotics/metabot.git ~/metabot
+cd ~/metabot
+npm ci --include=dev
+cp bots.example.json bots.json
+cp .env.example .env
 npm run dev
 ```
 
-## Prerequisites
-
-1. **Node.js 20+** is installed.
-2. **Claude Code CLI is installed and authenticated** — The Agent SDK spawns `claude` as a subprocess; it must be able to run independently.
-    - Install: `npm install -g @anthropic-ai/claude-code`
-    - Authenticate (one of):
-        - **OAuth login (recommended)**: Run `claude login` in a standalone terminal and complete the browser flow.
-        - **API Key**: Set `ANTHROPIC_API_KEY=sk-ant-...` in `.env` or your shell environment.
-    - Verify: Run `claude --version` and `claude "hello"` in a standalone terminal to confirm it works.
-
-    !!! warning
-        You cannot run `claude login` or `claude auth status` from inside a Claude Code session (nested sessions are blocked). Always use a separate terminal.
-
-3. **IM platform configured** — See [Quick Setup](quick-setup.md) or [Feishu App Setup](feishu-app-setup.md).
-
 ## Windows Notes
 
-The PowerShell installer auto-detects `winget`/`choco`/`scoop` for Node.js installation. The `metabot` CLI is installed with a `.cmd` wrapper and requires [Git for Windows](https://git-scm.com) (provides Git Bash).
+The PowerShell installer configures the Bridge and installs a `.cmd` wrapper
+for the `metabot` CLI. It requires Git for Windows. The complete local
+Core/Web UI lifecycle remains provided by the Linux/macOS Release installer
+until Windows reaches packaging parity.
 
-The complete local Core/Web UI lifecycle is currently provided by the signed-checksum Bash Release installer on Linux/macOS. Windows `install.ps1` remains a Bridge installer until its Core lifecycle reaches parity.
+Next: [Quick Setup](quick-setup.md) or the detailed
+[Feishu App Setup](feishu-app-setup.md).

@@ -7,6 +7,7 @@
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `BOTS_CONFIG` | — | `bots.json` 路径（多 Bot 模式） |
+| `METABOT_ENGINE` | `codex` | 默认引擎：`codex`、`kimi` 或兼容引擎 `claude` |
 | `FEISHU_APP_ID` | — | 飞书 App ID（单 Bot 模式） |
 | `FEISHU_APP_SECRET` | — | 飞书 App Secret（单 Bot 模式） |
 | `API_PORT` | `9100` | HTTP API 端口 |
@@ -16,11 +17,11 @@
 | `METABOT_FEISHU_WS_PING_TIMEOUT_SEC` | `20` | 飞书 WebSocket 的 Pong 看门狗，安全范围 5–300 秒 |
 | `METABOT_FEISHU_WS_HANDSHAKE_TIMEOUT_MS` | `15000` | 飞书 WebSocket 建连/重连握手超时，安全范围 1000–120000 毫秒 |
 
-## Claude Code
+## 工作区与 Claude 兼容
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DEFAULT_WORKING_DIRECTORY` | — | Claude 工作目录（单 Bot 模式） |
+| `CLAUDE_DEFAULT_WORKING_DIRECTORY` | — | 单 Bot 工作区的历史变量名；所有引擎都会使用 |
 | `CLAUDE_MAX_TURNS` | 不限 | 每次请求最大轮次 |
 | `CLAUDE_MAX_BUDGET_USD` | 不限 | 每次请求费用上限（美元） |
 | `CLAUDE_MODEL` | SDK 默认 | Claude 模型 |
@@ -35,8 +36,27 @@
 | `CODEX_BASE_URL` | Codex 默认 | OpenAI 兼容 API Base URL。会传给 Codex：`-c openai_base_url="..."` |
 | `CODEX_PROFILE` | — | Codex 配置 profile |
 | `CODEX_APPROVAL_POLICY` | `never` | 审批策略（`untrusted`、`on-failure`、`on-request`、`never`） |
-| `CODEX_SANDBOX` | `danger-full-access` | 沙箱模式（`read-only`、`workspace-write`、`danger-full-access`） |
+| `CODEX_SANDBOX` | `workspace-write` | 沙箱模式（`read-only`、`workspace-write`、`danger-full-access`） |
+| `CODEX_REASONING_EFFORT` | — | 可选默认值：`low`、`medium`、`high`、`xhigh`、`max` 或 `ultra` |
+| `CODEX_BYPASS_APPROVALS_AND_SANDBOX` | — | 仅在宿主隔离边界明确时设置为 `true` |
 | `CODEX_EXECUTABLE_PATH` | 自动检测 | `codex` 二进制路径 |
+
+公开版当前使用 `codex exec --json` 和 `codex exec resume`；这些变量不会启用
+Codex app-server 或原生执行中 steering。
+
+## Kimi Code 0.27+
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `KIMI_CODE_SERVER_URL` | `http://127.0.0.1:58627` | 已有本地 Kimi Server 地址；否则 MetaBot 按需启动 |
+| `KIMI_CODE_HOME` | `~/.kimi-code` | Kimi Code 配置和本地 Server Token 目录 |
+| `KIMI_API_KEY` | Kimi 登录状态 | 可选 Provider API Key，由本地 Server 继承 |
+
+使用 `npm install -g @moonshot-ai/kimi-code@latest` 安装支持的 CLI，然后执行
+`kimi login`。MetaBot 使用 Kimi 官方本地 Server API，不再使用旧 Python
+`kimi-cli --wire` 协议。每个 Bot 的 `model`、`thinking`、`executable`、
+`serverUrl` 和 `contextWindow` 覆盖应写入 `bots.json`；详见
+[多 Bot 模式](multi-bot.md#kimi-code-options)。
 
 ## MetaMemory
 

@@ -1,44 +1,44 @@
 # MetaBot
 
-**Infrastructure for building a supervised, self-improving agent organization.**
+**Run Codex and Kimi Code from Feishu/Lark, Telegram, WeChat, or the Web.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/xvirobotics/metabot/ci.yml?branch=main&style=flat-square)](https://github.com/xvirobotics/metabot/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/xvirobotics/metabot?style=flat-square)](https://github.com/xvirobotics/metabot)
 
----
+MetaBot is a self-hosted personal agent workspace. It combines a local Core,
+token-only Web UI, IM Bridge, CLI, Memory, Skills, T5T, and Agent Teams without
+requiring corporate SSO or OIDC.
 
-Claude Code and Kimi Code are the most capable AI coding agents — but they're both trapped in your laptop terminal.
+## Engines
 
-MetaBot sets them free. It gives every agent a **Claude Code or Kimi Code brain** (native subscriptions work directly — no API key required), persistent shared memory, the ability to create new agents, and a communication bus. All accessible from Feishu or Telegram on your phone.
+| Engine | Integration | Authentication | Position |
+|---|---|---|---|
+| **Codex CLI** | `codex exec --json` / `codex exec resume` | `codex login` or API profile | Default engine |
+| **Kimi Code 0.27+** | Official local Server API | `kimi login` | First-class alternative with durable Sessions and subagent state |
+| **Claude Code** | Compatibility CLI / SDK path | `claude login` or Anthropic-compatible API | Existing-bot compatibility |
 
-## Dual Engine: Claude Code ✕ Kimi Code
+The public Codex integration currently uses `codex exec`; it does not claim
+Codex app-server or native mid-turn steering. Kimi uses the official local
+Server API shared with Kimi's web frontend.
 
-| | Claude Code (Anthropic) | Kimi Code (Moonshot) |
-|---|---|---|
-| **Subscription login** | ✅ `claude login` OAuth | ✅ `kimi login` OAuth |
-| **API key fallback** | ✅ | ✅ |
-| **Context window** | 200k (1M optional) | 256k |
-| **Autonomous mode** | `bypassPermissions` | `yoloMode` (equivalent) |
+Each bot selects its engine and workspace independently. See
+[Multi-Bot Mode](configuration/multi-bot.md).
 
-Each bot picks its engine in `bots.json`. Frontend bot on Claude, backend bot on Kimi — totally fine. Cross-engine delegation through the Agent Bus is transparent to the caller. See [multi-bot config](configuration/multi-bot.md).
+## Core Capabilities
 
-## Core Components
-
-| Component | Description |
-|-----------|-------------|
-| **Dual Engine Kernel** | Each bot independently selects Claude Code or Kimi Code — full tool stack (Read/Write/Edit/Bash/Glob/Grep/WebSearch/MCP) in autonomous mode. |
-| **MetaSkill** | Agent factory. `/metaskill ios app` generates a complete `.claude/` agent team (orchestrator + specialists + code-reviewer). |
-| **MetaMemory** | Embedded SQLite knowledge store with full-text search and Web UI. Agents read/write Markdown documents across sessions. |
-| **IM Bridge** | Chat with any agent from Feishu/Lark or Telegram (including mobile). Streaming cards with color-coded status. |
-| **Web UI** | Browser-based chat at `/web/` with WebSocket streaming, phone call voice mode (VAD), MetaMemory browser, dark/light themes. [Learn more](features/web-ui.md) |
-| **Voice Assistant** | Hands-free voice control via iOS Shortcuts (Jarvis mode) or Web UI phone call mode. Server-side STT + TTS. [Learn more](features/voice-jarvis.md) |
-| **Agent Bus** | REST API on port 9100. Agents talk to each other via `metabot talk`. Create/remove bots at runtime. |
-| **Peers** | Federation system for cross-instance bot discovery and task routing. |
-| **Task Scheduler** | One-time delays and recurring cron jobs. Timezone-aware, persists across restarts. |
-| **CLI Tools** | `metabot` — the single CLI binary for service management, the bridge daemon API, and metabot-core delegation. |
+| Capability | Description |
+|---|---|
+| **IM Bridge** | Feishu/Lark, Telegram, and WeChat with streaming status, files, and exact @Bot routing |
+| **Local Core and Web UI** | Token-authenticated Agents, Chat, Memory, Skills, T5T, Teams, and diagnostics |
+| **Agent Teams and Bus** | Parallel teammates, durable tasks/runs, and cross-agent communication |
+| **MetaMemory** | Searchable knowledge across sessions with optional Feishu Wiki sync |
+| **Engine-native sessions** | Codex resume, durable Kimi Sessions, and Claude compatibility |
+| **Optional extensions** | Scheduling, Peers, voice, MetaSkill, and shared Skills |
 
 ## Quick Install
+
+Requires **Node.js >= 22.19**.
 
 === "Linux / macOS"
 
@@ -52,7 +52,10 @@ Each bot picks its engine in `bots.json`. Frontend bot on Claude, backend bot on
     irm https://raw.githubusercontent.com/xvirobotics/metabot/main/install.ps1 | iex
     ```
 
-The installer walks you through: working directory, **engine choice (Claude / Kimi)**, subscription login, IM credentials, and auto-start with PM2.
+The Linux/macOS installer verifies the Release checksum, installs the complete
+personal edition, stores the Core token at `~/.metabot-core/token` with mode
+`0600`, and configures the selected engine and chat channel. Open the local
+console at `http://localhost:9200`.
 
 [Get Started](getting-started/installation.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/xvirobotics/metabot){ .md-button }

@@ -7,6 +7,7 @@ All configuration is via `.env` file or system environment variables. Copy `.env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BOTS_CONFIG` | — | Path to `bots.json` for multi-bot mode |
+| `METABOT_ENGINE` | `codex` | Default engine: `codex`, `kimi`, or compatibility `claude` |
 | `FEISHU_APP_ID` | — | Feishu app ID (single-bot mode) |
 | `FEISHU_APP_SECRET` | — | Feishu app secret (single-bot mode) |
 | `API_PORT` | `9100` | HTTP API port |
@@ -17,11 +18,11 @@ All configuration is via `.env` file or system environment variables. Copy `.env
 | `METABOT_FEISHU_WS_HANDSHAKE_TIMEOUT_MS` | `15000` | Timeout for a Feishu WebSocket connect/reconnect handshake. Safe range: 1000–120000 ms |
 | `METABOT_PUBLIC_DISTRIBUTION` | — | metabot-core server flag. The `/cli/*` and `/install/*` install endpoints are token-gated by default; set to `1` (or `true`) to serve them anonymously. Only enable when you intentionally self-distribute and your build embeds no secrets |
 
-## Claude Code
+## Workspace and Claude Compatibility
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEFAULT_WORKING_DIRECTORY` | — | Working directory for Claude (single-bot mode) |
+| `CLAUDE_DEFAULT_WORKING_DIRECTORY` | — | Historical name for the single-bot workspace; used by every engine |
 | `CLAUDE_MAX_TURNS` | unlimited | Max turns per request |
 | `CLAUDE_MAX_BUDGET_USD` | unlimited | Max cost per request (USD) |
 | `CLAUDE_MODEL` | SDK default | Claude model to use |
@@ -36,8 +37,29 @@ All configuration is via `.env` file or system environment variables. Copy `.env
 | `CODEX_BASE_URL` | Codex default | OpenAI-compatible API base URL. Passed to Codex as `-c openai_base_url="..."` |
 | `CODEX_PROFILE` | — | Codex config profile |
 | `CODEX_APPROVAL_POLICY` | `never` | Approval policy (`untrusted`, `on-failure`, `on-request`, `never`) |
-| `CODEX_SANDBOX` | `danger-full-access` | Sandbox mode (`read-only`, `workspace-write`, `danger-full-access`) |
+| `CODEX_SANDBOX` | `workspace-write` | Sandbox mode (`read-only`, `workspace-write`, `danger-full-access`) |
+| `CODEX_REASONING_EFFORT` | — | Optional `low`, `medium`, `high`, `xhigh`, `max`, or `ultra` default |
+| `CODEX_BYPASS_APPROVALS_AND_SANDBOX` | — | Set `true` only when the host isolation boundary is intentional |
 | `CODEX_EXECUTABLE_PATH` | auto-detect | Path to `codex` binary |
+
+The public adapter currently uses `codex exec --json` and
+`codex exec resume`; these variables do not enable Codex app-server or native
+mid-turn steering.
+
+## Kimi Code 0.27+
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KIMI_CODE_SERVER_URL` | `http://127.0.0.1:58627` | Existing local Kimi Server origin; otherwise MetaBot starts it on demand |
+| `KIMI_CODE_HOME` | `~/.kimi-code` | Kimi Code configuration and local Server token directory |
+| `KIMI_API_KEY` | Kimi login state | Optional provider API key inherited by the local Server |
+
+Install the supported CLI with
+`npm install -g @moonshot-ai/kimi-code@latest`, then run `kimi login`.
+MetaBot uses Kimi's official local Server API rather than the retired Python
+`kimi-cli --wire` protocol. Per-bot `model`, `thinking`, `executable`,
+`serverUrl`, and `contextWindow` overrides belong in `bots.json`; see
+[Multi-Bot Mode](multi-bot.md#kimi-code-options).
 
 ## MetaMemory
 

@@ -1,6 +1,16 @@
 # 安装
 
-## 一键安装
+## 前置条件
+
+- **Node.js >= 22.19**
+- Git
+- 至少一个引擎和一个聊天渠道的凭证
+- Linux/macOS 才能使用完整的签名校验个人版生命周期
+
+Codex 是默认引擎，Kimi Code 是一级可选引擎；Claude Code 作为现有工作区
+的可选兼容引擎保留。
+
+## 一行安装
 
 === "Linux / macOS"
 
@@ -14,49 +24,98 @@
     irm https://raw.githubusercontent.com/xvirobotics/metabot/main/install.ps1 | iex
     ```
 
-Linux/macOS 安装器会验证 GitHub Release 校验和，安装完整个人版（本地 Core + Web UI + Bridge + CLI），把首次 Token 以 `0600` 权限保存到 `~/.metabot-core/token`，再引导完成引擎认证和 IM 凭证。控制台地址为 `http://localhost:9200`。
+Linux/macOS 安装器会：
 
-如需连接已有外部 Core，请设置 `METABOT_INSTALL_CORE=0`，并提供 `METABOT_CORE_URL` / `METABOT_CORE_TOKEN`。
+1. 下载最新公开 GitHub Release 并验证 `SHA256SUMS`；
+2. 安装本地 Core、仅 Token 登录的 Web UI、Bridge、CLI 和内置 Skills；
+3. 把自动生成的 Core Token 以 `0600` 权限保存到 `~/.metabot-core/token`；
+4. 引导选择工作区、引擎、认证和 IM 渠道；
+5. 将 Core 和 Bridge 作为独立 PM2 应用启动。
+
+个人控制台地址为 `http://localhost:9200`。安装器不会把原始 Token 输出到
+日志。Core 数据默认存放在 `~/.metabot-core/`，Bridge 状态默认存放在
+`~/.metabot/`。
+
+安装到其他目录：
+
+```bash
+METABOT_HOME=/opt/metabot bash install.sh
+```
+
+默认目录为 `~/metabot`。
+
+## 引擎认证
+
+请在独立终端执行登录命令。
+
+### Codex CLI（默认）
+
+```bash
+npm install -g @openai/codex
+codex login
+```
+
+MetaBot 公开版当前使用 `codex exec --json` 和 `codex exec resume`，不要求、
+也不宣称支持 Codex app-server。
+
+### Kimi Code 0.27+
+
+```bash
+npm install -g @moonshot-ai/kimi-code@latest
+kimi login
+```
+
+MetaBot 使用 Kimi Code 官方 loopback Server API，与 Kimi Web UI 使用同一套
+前端协议。该路径不再支持旧 Python `kimi-cli --wire` 集成。
+
+### Claude Code 兼容
+
+只有现有 Bot 或工作区明确选择 `"engine": "claude"` 时，才需要安装并执行
+`claude login`。
 
 ## 更新
 
-已安装？一条命令下载最新公开个人版安装包、构建、更新 skills、重启：
+Package 安装从稳定 GitHub Release 资源更新：
 
 ```bash
 metabot update
 ```
 
-如果本机已经安装过 `lark-cli` 或飞书/Lark skills，`metabot update` 也会自动更新它们并同步到 bot 工作目录。
-
-开发者源码 checkout 可以显式使用 `metabot update --git` 走 Git 更新。普通 bot 主机建议使用默认 package refresh，不再依赖 Git 权限。
-
-## 手动安装
+源码 checkout 显式使用 Git：
 
 ```bash
-git clone https://github.com/xvirobotics/metabot.git
-cd metabot && npm install
-cp bots.example.json bots.json   # 编辑 Bot 配置
-cp .env.example .env              # 编辑全局设置
+metabot update --git
+```
+
+更新器会保留 `.env`、`bots.json`、用户数据、日志、工作区说明和用户修改过的
+Skills。Release 与源码更新路径相互独立。
+
+## 使用已有外部 Core
+
+只安装 Bridge 并连接已有 Core：
+
+```bash
+METABOT_INSTALL_CORE=0 bash install.sh
+```
+
+配置 `METABOT_CORE_URL` 和 `METABOT_CORE_TOKEN`。安装器不会替换其他目录的
+Core PM2 进程或其数据。
+
+## 源码开发安装
+
+```bash
+git clone https://github.com/xvirobotics/metabot.git ~/metabot
+cd ~/metabot
+npm ci --include=dev
+cp bots.example.json bots.json
+cp .env.example .env
 npm run dev
 ```
 
-## 前置条件
-
-1. **Node.js 20+** 已安装。
-2. **Claude Code CLI 已安装并认证** — Agent SDK 以子进程方式启动 `claude`，必须能独立运行。
-    - 安装：`npm install -g @anthropic-ai/claude-code`
-    - 认证（选一种）：
-        - **OAuth 登录（推荐）**：在独立终端运行 `claude login` 完成浏览器认证。
-        - **API Key**：在 `.env` 或环境变量中设置 `ANTHROPIC_API_KEY=sk-ant-...`。
-    - 验证：在独立终端运行 `claude --version` 和 `claude "hello"` 确认正常。
-
-    !!! warning "注意"
-        不能在 Claude Code 会话内运行 `claude login` 或 `claude auth status`（不支持嵌套）。务必使用独立终端。
-
-3. **IM 平台已配置** — 参见[快速配置](quick-setup.md)或[飞书应用配置](feishu-app-setup.md)。
-
 ## Windows 说明
 
-PowerShell 安装器自动检测 `winget`/`choco`/`scoop` 来安装 Node.js。`metabot` CLI 通过 `.cmd` 包装器安装，需要 [Git for Windows](https://git-scm.com)（提供 Git Bash）。
+PowerShell 安装器会配置 Bridge，并为 `metabot` CLI 安装 `.cmd` wrapper；需要
+Git for Windows。完整本地 Core/Web UI 生命周期目前仍由 Linux/macOS Release
+安装器提供，直到 Windows 打包能力达到同等水平。
 
-完整本地 Core/Web UI 生命周期目前由 Linux/macOS 的带校验和 Bash Release 安装器提供；Windows `install.ps1` 在补齐 Core 生命周期前仍只安装 Bridge。
+下一步：[快速配置](quick-setup.md)或详细的[飞书应用配置](feishu-app-setup.md)。

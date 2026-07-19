@@ -43,6 +43,9 @@ export class StreamProcessor {
   private _lastOutputTokens: number | undefined;
   // Live background tasks (Monitor, etc.) — task_id → latest rollup.
   private _backgroundEvents: Map<string, BackgroundEvent> = new Map();
+  // Kimi/Codex snapshot adapters may repeat the same native tool id while it
+  // is running. Update that row instead of appending duplicate card entries.
+  private _nativeToolIndexes: Map<string, number> = new Map();
 
   constructor(private userPrompt: string) {}
 
@@ -181,7 +184,13 @@ export class StreamProcessor {
           this.responseText = block.text;
         }
       } else if (block.type === 'tool_use' && block.name) {
-        this.addToolCall(block.name, block.input);
+        const existingIndex = block.id ? this._nativeToolIndexes.get(block.id) : undefined;
+        if (existingIndex !== undefined) {
+          this.updateToolCall(existingIndex, block.name, block.input);
+        } else {
+          const index = this.addToolCall(block.name, block.input);
+          if (block.id) this._nativeToolIndexes.set(block.id, index);
+        }
         // Detect interactive tools at top level
         if (message.parent_tool_use_id === null || message.parent_tool_use_id === undefined) {
           if (block.name === 'AskUserQuestion' && block.id && block.input) {
@@ -305,13 +314,14 @@ export class StreamProcessor {
     };
   }
 
-  private addToolCall(name: string, input: unknown): void {
+  private addToolCall(name: string, input: unknown): number {
     // Complete previous tool
     this.completeCurrentTool();
 
     this.currentToolName = name;
     const detail = formatToolDetail(name, input);
     this.toolCalls.push({ name, detail, status: 'running' });
+    const index = this.toolCalls.length - 1;
 
     // Track image file paths and plan file paths from Write tool
     if (name === 'Write' && input && typeof input === 'object') {
@@ -323,6 +333,15 @@ export class StreamProcessor {
         this._planFilePath = filePath;
       }
     }
+    return index;
+  }
+
+  private updateToolCall(index: number, name: string, input: unknown): void {
+    const tool = this.toolCalls[index];
+    if (!tool) return;
+    tool.name = name;
+    const detail = formatToolDetail(name, input);
+    if (detail) tool.detail = detail;
   }
 
   private completeCurrentTool(): void {
@@ -442,13 +461,13 @@ function formatToolDetail(name: string, input: unknown): string {
 
   switch (name) {
     case 'Read':
-      return inp.file_path ? `\`${shortenPath(inp.file_path as string)}\`` : '';
+      return inp.file_path || inp.path ? `\`${shortenPath(String(inp.file_path ?? inp.path))}\`` : '';
     case 'Write':
-      return inp.file_path ? `\`${shortenPath(inp.file_path as string)}\`` : '';
+      return inp.file_path || inp.path ? `\`${shortenPath(String(inp.file_path ?? inp.path))}\`` : '';
     case 'Edit':
-      return inp.file_path ? `\`${shortenPath(inp.file_path as string)}\`` : '';
+      return inp.file_path || inp.path ? `\`${shortenPath(String(inp.file_path ?? inp.path))}\`` : '';
     case 'Bash':
-      return inp.command ? `\`${truncate(inp.command as string, 60)}\`` : '';
+      return inp.command || inp.cmd ? `\`${truncate(String(inp.command ?? inp.cmd), 60)}\`` : '';
     case 'Glob':
       return inp.pattern ? `\`${inp.pattern}\`` : '';
     case 'Grep':

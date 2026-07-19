@@ -21,6 +21,8 @@ import {
   SessionManager,
 } from '../engines/index.js';
 import { listClaudeSessions, type SessionSummary } from '../engines/claude/session-lister.js';
+import { listCodexSessions } from '../engines/codex/session-lister.js';
+import { listKimiSessions } from '../engines/kimi/session-lister.js';
 import { ExecutorRegistry } from '../engines/claude/executor-registry.js';
 import { RateLimiter } from './rate-limiter.js';
 import { OutputsManager } from './outputs-manager.js';
@@ -1260,12 +1262,28 @@ export class MessageBridge {
   }
 
   /**
-   * List the recent Claude sessions for a chat's working directory, newest
-   * first. Read-only — does not touch session state. Used by the `/resume`
-   * picker and the direct `/resume <id>` form.
+   * List recent sessions for the chat's active engine and working directory.
+   * Read-only — does not touch session state.
    */
-  listSessionsForChat(chatId: string): SessionSummary[] {
+  async listSessionsForChat(chatId: string): Promise<SessionSummary[]> {
     const session = this.sessionManager.getSession(chatId);
+    const engineName = session.engine ?? resolveEngineName(this.config);
+    if (engineName === 'codex') {
+      return listCodexSessions({
+        workingDirectory: session.workingDirectory,
+        currentSessionId: session.sessionId,
+      });
+    }
+    if (engineName === 'kimi') {
+      return listKimiSessions({
+        workingDirectory: session.workingDirectory,
+        currentSessionId: session.sessionId,
+        executable: this.config.kimi?.executable,
+        serverUrl: this.config.kimi?.serverUrl,
+        apiKey: this.config.kimi?.apiKey,
+      });
+    }
+    if (engineName !== 'claude') return [];
     return listClaudeSessions({
       workingDirectory: session.workingDirectory,
       currentSessionId: session.sessionId,
@@ -1273,7 +1291,7 @@ export class MessageBridge {
   }
 
   /**
-   * Switch a chat into a previous Claude session. Single source of truth for
+   * Switch a chat into a previous engine session. Single source of truth for
    * the `/resume` swap (both the picker and the direct form route here):
    *   1. point the chat's sessionId at the chosen transcript,
    *   2. zero the cumulative usage counters (they belonged to the old session),
@@ -1282,14 +1300,19 @@ export class MessageBridge {
    * The actual `--resume` happens lazily on the user's next message.
    */
   async applyResume(chatId: string, sessionId: string): Promise<void> {
-    this.sessionManager.setSessionId(chatId, sessionId, 'claude');
+    const session = this.sessionManager.getSession(chatId);
+    const engineName = session.engine ?? resolveEngineName(this.config);
+    this.sessionManager.setSessionId(chatId, sessionId, engineName);
     this.sessionManager.resetUsage(chatId);
     try {
       await this.releaseChatExecutor(chatId, 'resume-command');
     } catch (err) {
       this.logger.warn({ err, chatId }, 'applyResume: failed to release persistent executor');
     }
-    this.logger.info({ chatId, sessionId: sessionId.slice(0, 8) }, 'MessageBridge: resumed session');
+    this.logger.info(
+      { chatId, engine: engineName, sessionId: sessionId.slice(0, 8) },
+      'MessageBridge: resumed session',
+    );
   }
 
   /**

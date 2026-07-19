@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MetaBot — Infrastructure for the Agent-Native Organization</title>
-    <meta name="description" content="MetaBot: Infrastructure for building a supervised, self-improving agent organization. Run Claude Code or Kimi Code (both native subscriptions supported) from Feishu & Telegram with shared memory, agent factory, and communication bus.">
+    <meta name="description" content="MetaBot Personal Edition: run Codex or Kimi Code from Feishu/Lark, Telegram, WeChat, and the Web. Codex-first, token-only, self-hosted, with Claude Code compatibility.">
     <meta property="og:title" content="MetaBot — Infrastructure for the Agent-Native Organization">
-    <meta property="og:description" content="Give every AI agent a Claude Code or Kimi Code brain (native subscriptions, no API key required), shared memory, and a communication bus. Accessible from your phone.">
+    <meta property="og:description" content="A Codex-first, self-hosted personal agent workspace with Kimi Code 0.27+ Server API support, Claude compatibility, shared memory, and Agent Teams.">
     <meta property="og:image" content="https://raw.githubusercontent.com/xvirobotics/metabot/main/resources/metabot.png">
     <meta property="og:url" content="https://xvirobotics.github.io/metabot">
     <meta name="twitter:card" content="summary_large_image">
@@ -432,7 +432,7 @@
         </div>
         <h1>Infrastructure for the Agent-Native Organization</h1>
         <p class="hero-sub">
-            Give every AI agent a Claude Code or Kimi Code brain &mdash; both native subscriptions work directly, no API key. Plus persistent shared memory and a communication bus. Supervised by humans on Feishu or Telegram.
+            Run Codex or Kimi Code from Feishu/Lark, Telegram, WeChat, or the Web. Codex is the default engine; Kimi Code 0.27+ uses its official local Server API, and Claude Code remains available for compatibility.
         </p>
         <div class="cta-group">
             <a href="#install" class="cta-primary">Get Started</a>
@@ -479,8 +479,8 @@
             <div class="comp-card">
                 <div class="icon">SDK</div>
                 <div>
-                    <h4>Dual Engine Kernel</h4>
-                    <p>Each bot picks Claude Code or Kimi Code in <code>bots.json</code>. Full tool stack either way &mdash; Read/Write/Edit/Bash/Glob/Grep/WebSearch/MCP. Both native subscriptions (<code>claude login</code> / <code>kimi login</code>) work directly. Autonomous mode (<code>bypassPermissions</code> / <code>yoloMode</code>).</p>
+                    <h4>Codex-First Engine Router</h4>
+                    <p>Each bot picks Codex, Kimi Code, or Claude compatibility in <code>bots.json</code>. Codex currently runs through <code>codex exec --json</code>; Kimi Code 0.27+ uses the official local Server API for durable Sessions, questions, tools, and subagents. Your own subscription login stays local.</p>
                 </div>
             </div>
             <div class="comp-card">
@@ -542,7 +542,7 @@
             </div>
         </div>
         <p style="margin-top: 24px; font-size: 0.85rem; color: var(--text-dim);">
-            Prerequisites: Node.js 20+, plus one of: <a href="https://github.com/anthropics/claude-code">Claude Code CLI</a> (<code>claude login</code>) or <a href="https://platform.moonshot.ai">Kimi CLI</a> (<code>uv tool install kimi-cli && kimi login</code>). The installer asks which engine(s) to set up.
+            Prerequisites: Node.js &gt;= 22.19, plus Codex (<code>npm install -g @openai/codex &amp;&amp; codex login</code>) or Kimi Code 0.27+ (<code>npm install -g @moonshot-ai/kimi-code@latest &amp;&amp; kimi login</code>). Claude Code is an optional compatibility engine. The installer asks which engine and channel to set up.
         </p>
     </section>
 
@@ -554,7 +554,7 @@
             <div class="usecase-item">
                 <span class="emoji">&#x1f4f1;</span>
                 <h4>Solo AI Developer</h4>
-                <p>Full Claude Code or Kimi Code from your phone, bound to your project. Your existing subscription works directly. Code on the go via Feishu or Telegram.</p>
+                <p>Codex or Kimi Code from your phone, bound to your project and authenticated with your own subscription. Code on the go via Feishu/Lark, Telegram, WeChat, or the Web; keep Claude Code for existing workspaces.</p>
             </div>
             <div class="usecase-item">
                 <span class="emoji">&#x1f465;</span>

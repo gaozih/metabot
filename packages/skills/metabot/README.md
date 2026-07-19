@@ -1,28 +1,28 @@
-# `metabot` — Claude Code skill bundle
+# `metabot` Agent Skill bundle
 
-This directory ships the canonical Claude Code skill for the unified `metabot` CLI. It's the address-book + memory + skills front-end for the entire metabot-core stack.
+Engine-neutral instructions for the unified `metabot` CLI in MetaBot Personal
+Edition. The same bundle works with Codex, Kimi Code, and Claude Code.
 
-## Install
+The one-line installer mirrors the complete bundle to:
+
+- `~/.codex/skills/metabot`
+- `~/.agents/skills/metabot`
+- `~/.claude/skills/metabot`
+- the matching per-workspace skill roots
+
+To install it manually, choose the destination for your engine:
 
 ```bash
-# Per-project (default): writes to <cwd>/.claude/skills/metabot/SKILL.md
-metabot skills install metabot
-
-# Global (recommended for personal Claude Code installs):
+metabot skills install metabot --to ~/.codex/skills/metabot
+metabot skills install metabot --to ~/.agents/skills/metabot
 metabot skills install metabot --to ~/.claude/skills/metabot
 ```
 
-**Mind the install path landmine.** `metabot skills install <name>` (and its alias `mh install <name>`) defaults to `<cwd>/.claude/skills/<name>` — a per-project install. If you want every Claude Code session on your machine to see this skill, pass `--to ~/.claude/skills/metabot`. Without that flag, other sessions outside the install cwd will not see the skill and will wonder why `metabot agents …` shows up as an "unknown command" hint instead of a usable tool.
+This bundle documents Memory, Skill Hub, the personal-edition agent registry
+and inbox relay, Agent Teams routing, T5T, and runtime operations. Legacy
+`mm`, `mh`, and `mb` binaries are intentionally absent.
 
-The legacy `metamemory` and `skill-hub` Claude Code skills keep working unchanged; this one is purely additive.
-
-## What's inside
-
-- `SKILL.md` — the user-facing skill manifest with frontmatter (`name`, `description`) and the full `metabot` CLI reference: `memory`, `skills`, `agents` (incl. `talk <peer>/<bot> [<chatId>] "<msg>"` with project-derived chatId default), `inbox` (central spool for CC/Codex agents that have no resident bridge), and `t5t`.
-
-## Source of truth
-
-This skill is published from this directory inside `metabot-core`. To re-publish after editing:
+Publish changes from this directory:
 
 ```bash
 metabot skills publish metabot --from packages/skills/metabot

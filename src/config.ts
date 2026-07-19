@@ -36,7 +36,23 @@ loadEnvFiles();
 
 /** Agent engine backing a bot. */
 export type EngineName = 'claude' | 'kimi' | 'codex';
-export type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
+export type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+
+export function normalizeCodexReasoningEffort(value: unknown): CodexReasoningEffort | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === 'low' ||
+    normalized === 'medium' ||
+    normalized === 'high' ||
+    normalized === 'xhigh' ||
+    normalized === 'max' ||
+    normalized === 'ultra'
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
 
 /** Shared config fields used by MessageBridge and Executors (platform-agnostic). */
 export interface BotConfigBase {
@@ -105,7 +121,11 @@ export interface BotConfigBase {
     model?: string;
     thinking?: boolean;
     apiKey?: string;
-    /** Context window size in tokens (defaults to 262144 — Kimi for Coding default). */
+    /** Kimi tool permission policy. Defaults to safe `auto`; `yolo` must be explicit. */
+    permissionMode?: 'auto' | 'yolo';
+    /** Kimi Code local Server origin. Personal edition accepts loopback only. */
+    serverUrl?: string;
+    /** Context window size in tokens (defaults to 1M for current Kimi Code). */
     contextWindow?: number;
   };
   /** Codex-specific overrides. Populated only when engine === 'codex'. */
@@ -248,7 +268,11 @@ export interface KimiJsonConfig {
   model?: string;
   thinking?: boolean;
   apiKey?: string;
-  /** Context window size in tokens (defaults to 262144 — Kimi for Coding default). */
+  /** Kimi tool permission policy. Defaults to safe `auto`; `yolo` must be explicit. */
+  permissionMode?: 'auto' | 'yolo';
+  /** Kimi Code local Server origin. Personal edition accepts loopback only. */
+  serverUrl?: string;
+  /** Context window size in tokens (defaults to 1M for current Kimi Code). */
   contextWindow?: number;
 }
 
@@ -487,6 +511,7 @@ function buildClaudeConfig(entry: {
 }
 
 function buildCodexConfig(entry?: CodexJsonConfig): BotConfigBase['codex'] | undefined {
+  const envReasoningEffort = normalizeCodexReasoningEffort(process.env.CODEX_REASONING_EFFORT);
   const cfg: BotConfigBase['codex'] = {
     ...(process.env.CODEX_EXECUTABLE_PATH ? { executable: process.env.CODEX_EXECUTABLE_PATH } : {}),
     ...(process.env.CODEX_MODEL ? { model: process.env.CODEX_MODEL } : {}),
@@ -498,14 +523,10 @@ function buildCodexConfig(entry?: CodexJsonConfig): BotConfigBase['codex'] | und
     ...(process.env.CODEX_SANDBOX ? { sandbox: process.env.CODEX_SANDBOX as CodexJsonConfig['sandbox'] } : {}),
     ...(process.env.CODEX_BYPASS_APPROVALS_AND_SANDBOX === 'true' ? { dangerouslyBypassApprovalsAndSandbox: true } : {}),
     ...(process.env.CODEX_CONTEXT_WINDOW ? { contextWindow: parseInt(process.env.CODEX_CONTEXT_WINDOW, 10) } : {}),
-    ...(isCodexReasoningEffort(process.env.CODEX_REASONING_EFFORT) ? { reasoningEffort: process.env.CODEX_REASONING_EFFORT } : {}),
+    ...(envReasoningEffort ? { reasoningEffort: envReasoningEffort } : {}),
     ...(entry ?? {}),
   };
   return Object.keys(cfg).length > 0 ? cfg : undefined;
-}
-
-function isCodexReasoningEffort(value: unknown): value is CodexReasoningEffort {
-  return value === 'low' || value === 'medium' || value === 'high' || value === 'xhigh';
 }
 
 // --- Single-bot env var mode ---

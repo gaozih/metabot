@@ -13,10 +13,12 @@ const SLASH_PICKERS: Record<string, { question: string; header: string; options:
     question: 'Set the reasoning effort level',
     header: 'Effort',
     options: [
-      { label: 'xhigh', description: 'Maximum Codex-supported effort for deep agentic/coding work' },
-      { label: 'high', description: 'Complex reasoning — quality over speed/cost' },
-      { label: 'medium', description: 'Balanced speed, cost & performance (default)' },
-      { label: 'low', description: 'Fastest — high-volume / latency-sensitive work' },
+      { label: 'low', description: 'Fast responses with lighter reasoning' },
+      { label: 'medium', description: 'Balanced speed and reasoning depth for everyday tasks' },
+      { label: 'high', description: 'Greater reasoning depth for complex problems' },
+      { label: 'xhigh', description: 'Extra-high reasoning depth for complex problems' },
+      { label: 'max', description: 'Maximum reasoning depth for the hardest problems' },
+      { label: 'ultra', description: 'Maximum reasoning with automatic task delegation' },
     ],
   },
 };
@@ -37,7 +39,7 @@ export class SlashPickerController {
       sender: IMessageSender;
       sessionManager: SessionManager;
       outputsManager: OutputsManager;
-      listSessionsForChat: (chatId: string) => SessionSummary[];
+      listSessionsForChat: (chatId: string) => SessionSummary[] | Promise<SessionSummary[]>;
       applyResume: (chatId: string, sessionId: string) => Promise<void>;
       finalizeQuestionCard: (messageId: string, state: CardState) => Promise<void>;
       handleMessage: (msg: IncomingMessage) => Promise<void>;
@@ -189,22 +191,22 @@ export class SlashPickerController {
     const { chatId } = msg;
     const session = this.deps.sessionManager.getSession(chatId);
     const activeEngine = session.engine ?? resolveEngineName(this.deps.config);
-    if (activeEngine !== 'claude') {
+    if (activeEngine !== 'claude' && activeEngine !== 'codex' && activeEngine !== 'kimi') {
       await this.deps.sender.sendTextNotice(
         chatId,
-        'ℹ️ /resume is Claude-only',
-        `This chat is on the \`${activeEngine}\` engine. Session resume is only available for the Claude engine.`,
+        'ℹ️ /resume Unsupported',
+        `This chat is on the \`${activeEngine}\` engine. Session resume is available for Claude, Codex, and Kimi.`,
         'blue',
       );
       return true;
     }
 
-    const sessions = this.deps.listSessionsForChat(chatId);
+    const sessions = await this.deps.listSessionsForChat(chatId);
     if (sessions.length === 0) {
       await this.deps.sender.sendTextNotice(
         chatId,
         'ℹ️ No Previous Sessions',
-        'No earlier Claude sessions were found for this chat\'s working directory.',
+        `No earlier ${activeEngine} sessions were found for this chat's working directory.`,
         'blue',
       );
       return true;
@@ -303,8 +305,14 @@ export class SlashPickerController {
 function normalizeCodexEffort(value: string): CodexReasoningEffort | 'reset' | undefined {
   const normalized = value.trim().toLowerCase();
   if (normalized === 'reset' || normalized === 'clear' || normalized === 'default') return 'reset';
-  if (normalized === 'max') return 'xhigh';
-  if (normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'xhigh') return normalized;
+  if (
+    normalized === 'low' ||
+    normalized === 'medium' ||
+    normalized === 'high' ||
+    normalized === 'xhigh' ||
+    normalized === 'max' ||
+    normalized === 'ultra'
+  ) return normalized;
   return undefined;
 }
 

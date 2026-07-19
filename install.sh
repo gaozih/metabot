@@ -244,6 +244,26 @@ check_command() {
 MISSING=0
 check_command git "Git" "https://git-scm.com/downloads" || MISSING=1
 
+version_at_least() {
+  local current="${1#v}"
+  local required="${2#v}"
+  local current_major current_minor current_patch
+  local required_major required_minor required_patch
+
+  current="$(printf '%s' "$current" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')"
+  required="$(printf '%s' "$required" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')"
+  [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  [[ "$required" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+
+  IFS=. read -r current_major current_minor current_patch <<< "$current"
+  IFS=. read -r required_major required_minor required_patch <<< "$required"
+  (( current_major > required_major )) ||
+    (( current_major == required_major && current_minor > required_minor )) ||
+    (( current_major == required_major && current_minor == required_minor && current_patch >= required_patch ))
+}
+
+MIN_NODE_VERSION="22.19.0"
+
 install_node() {
   info "Installing Node.js 22.x via NodeSource..."
   if [[ "$OS" == "Linux" ]]; then
@@ -276,7 +296,7 @@ install_node() {
     fi
   fi
   # Verify
-  if command -v node &>/dev/null; then
+  if command -v node &>/dev/null && version_at_least "$(node --version)" "$MIN_NODE_VERSION"; then
     success "Node.js installed: $(node --version)"
     return 0
   fi
@@ -286,11 +306,10 @@ install_node() {
 NEED_NODE=false
 if command -v node &>/dev/null; then
   NODE_VER="$(node --version | sed 's/v//')"
-  NODE_MAJOR="$(echo "$NODE_VER" | cut -d. -f1)"
-  if [[ "$NODE_MAJOR" -ge 20 ]]; then
+  if version_at_least "$NODE_VER" "$MIN_NODE_VERSION"; then
     success "Node.js found: v${NODE_VER}"
   else
-    warn "Node.js v${NODE_VER} found, but v20+ is required."
+    warn "Node.js v${NODE_VER} found, but v${MIN_NODE_VERSION}+ is required."
     NEED_NODE=true
   fi
 else
@@ -303,12 +322,12 @@ if [[ "$NEED_NODE" == "true" ]]; then
     if install_node; then
       success "Node.js ready"
     else
-      error "Automatic install failed. Please install Node.js 20+ manually:"
+      error "Automatic install failed. Please install Node.js ${MIN_NODE_VERSION}+ manually:"
       echo "  https://nodejs.org/ or use nvm/fnm"
       MISSING=1
     fi
   else
-    error "Node.js 20+ is required. Install manually and re-run."
+    error "Node.js ${MIN_NODE_VERSION}+ is required. Install manually and re-run."
     exit 1
   fi
 fi
@@ -515,33 +534,40 @@ else
   fi
 fi
 
-# Install uv + kimi-cli helper. Used by the Kimi engine path below.
+# Install the current Kimi Code CLI. MetaBot's Kimi adapter requires the 0.27+
+# local Server API; the retired Python kimi-cli `--wire` surface is incompatible.
+kimi_code_version() {
+  local output
+  output="$(kimi --version 2>/dev/null | head -1 || true)"
+  printf '%s' "$output" | sed -nE 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p'
+}
+
 install_kimi_cli() {
   if command -v kimi &>/dev/null; then
-    success "Kimi CLI found: $(command -v kimi)"
-    return 0
-  fi
-  # Need uv first (kimi-cli is a Python tool distributed via uv)
-  if ! command -v uv &>/dev/null; then
-    info "Installing uv (required by kimi-cli)..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
-    # uv installs to ~/.local/bin — make sure it's on PATH for this script
-    export PATH="$HOME/.local/bin:$PATH"
-    if ! command -v uv &>/dev/null; then
-      warn "uv install failed. Install manually from https://astral.sh/uv and re-run."
-      return 1
+    local installed_version
+    installed_version="$(kimi_code_version)"
+    if [[ -n "$installed_version" ]] && version_at_least "$installed_version" "0.27.0"; then
+      success "Kimi Code found: $(command -v kimi) (v${installed_version})"
+      return 0
     fi
-    success "uv installed: $(uv --version)"
+    warn "Kimi CLI at $(command -v kimi) is older than 0.27.0 or has an unreadable version; upgrading."
   fi
-  info "Installing kimi-cli via uv..."
-  if uv tool install kimi-cli 2>&1 | tail -3; then
+
+  info "Installing Kimi Code 0.27+ from npm..."
+  mkdir -p "$HOME/.local"
+  if npm install -g --prefix "$HOME/.local" @moonshot-ai/kimi-code@latest 2>&1 | tail -3; then
     export PATH="$HOME/.local/bin:$PATH"
+    hash -r
+    local installed_version=""
     if command -v kimi &>/dev/null; then
-      success "Kimi CLI installed: $(command -v kimi)"
+      installed_version="$(kimi_code_version)"
+    fi
+    if [[ -n "$installed_version" ]] && version_at_least "$installed_version" "0.27.0"; then
+      success "Kimi Code installed: $(command -v kimi) (v${installed_version})"
       return 0
     fi
   fi
-  warn "Kimi CLI install failed. Install manually: uv tool install kimi-cli"
+  warn "Kimi Code 0.27+ install verification failed. Install manually: npm install -g @moonshot-ai/kimi-code@latest"
   return 1
 }
 
@@ -684,32 +710,32 @@ if [[ "$SKIP_CONFIG" == "false" ]]; then
   # ------ 4a: Working directory ------
   echo ""
   echo -e "${BOLD}Working Directory:${NC}"
-  prompt_input WORK_DIR "Project directory for Claude to work in" "$HOME/metabot-workspace"
+  prompt_input WORK_DIR "Project directory for the Agent to work in" "$HOME/metabot-workspace"
   mkdir -p "$WORK_DIR"
   success "Working directory: ${WORK_DIR}"
 
   # ------ 4b: Engine selection ------
   echo ""
   echo -e "${BOLD}Agent Engine:${NC}"
-  echo "  1) Claude Code (Anthropic)"
-  echo "  2) Kimi (Moonshot AI — requires kimi-cli login, uses your subscription)"
-  echo "  3) Codex CLI (OpenAI — requires codex login, uses your ChatGPT subscription)"
+  echo "  1) Codex CLI (OpenAI — requires codex login, uses your ChatGPT subscription)"
+  echo "  2) Kimi Code (Moonshot AI — requires kimi login, uses your subscription; default model kimi-code/k3)"
+  echo "  3) Claude Code compatibility (Anthropic)"
   prompt_choice ENGINE_CHOICE "1"
 
-  BOT_ENGINE="claude"
+  BOT_ENGINE="codex"
   CLAUDE_AUTH_ENV_LINES=""
-  CLAUDE_AUTH_METHOD="subscription"
+  CLAUDE_AUTH_METHOD="codex"
 
   if [[ "$ENGINE_CHOICE" == "2" ]]; then
     BOT_ENGINE="kimi"
     CLAUDE_AUTH_METHOD="kimi"
     echo ""
-    info "Installing kimi-cli..."
-    install_kimi_cli || warn "Continuing despite kimi-cli install failure — you can install it later."
+    info "Installing Kimi Code..."
+    install_kimi_cli || warn "Continuing despite Kimi Code install failure — you can install it later."
     info "After install, run 'kimi login' in a separate terminal to authenticate."
     # Skip the Claude provider prompt entirely for Kimi — it has its own auth.
     AUTH_CHOICE="kimi"
-  elif [[ "$ENGINE_CHOICE" == "3" ]]; then
+  elif [[ "$ENGINE_CHOICE" == "1" ]]; then
     BOT_ENGINE="codex"
     CLAUDE_AUTH_METHOD="codex"
     echo ""
@@ -919,7 +945,7 @@ if [[ "$SKIP_CONFIG" == "false" ]]; then
     if [[ "$CLAUDE_AUTH_METHOD" == "subscription" ]]; then
       echo "# Using Claude Code Subscription (OAuth). Run 'claude login' to authenticate."
     elif [[ "$CLAUDE_AUTH_METHOD" == "kimi" ]]; then
-      echo "# Using Kimi CLI. Run 'kimi login' to authenticate."
+      echo "# Using Kimi Code 0.27+ (default model: kimi-code/k3). Run 'kimi login' to authenticate."
     elif [[ "$CLAUDE_AUTH_METHOD" == "codex" ]]; then
       echo "# Using Codex CLI. Run 'codex login' to authenticate (or set OPENAI_API_KEY / configure ~/.codex/config.toml)."
       echo "# CODEX_EXECUTABLE_PATH="
@@ -987,7 +1013,7 @@ if [[ "$SKIP_CONFIG" == "false" ]]; then
         feishuAppSecret: process.argv[3],
         defaultWorkingDirectory: process.argv[4],
       };
-      if (engine === 'kimi') { bot.kimi = { thinking: true }; }
+      if (engine === 'kimi') { bot.kimi = { model: 'kimi-code/k3', thinking: true, permissionMode: 'auto' }; }
       if (engine === 'codex') { bot.codex = { approvalPolicy: 'never', sandbox: 'workspace-write' }; }
       console.log(JSON.stringify([bot], null, 2))
     " "$BOT_NAME" "$FEISHU_APP_ID" "$FEISHU_APP_SECRET" "$WORK_DIR" "${BOT_ENGINE:-claude}")
@@ -1004,7 +1030,7 @@ if [[ "$SKIP_CONFIG" == "false" ]]; then
         telegramBotToken: process.argv[2],
         defaultWorkingDirectory: process.argv[3],
       };
-      if (engine === 'kimi') { bot.kimi = { thinking: true }; }
+      if (engine === 'kimi') { bot.kimi = { model: 'kimi-code/k3', thinking: true, permissionMode: 'auto' }; }
       if (engine === 'codex') { bot.codex = { approvalPolicy: 'never', sandbox: 'workspace-write' }; }
       console.log(JSON.stringify([bot], null, 2))
     " "$TG_NAME" "$TELEGRAM_BOT_TOKEN" "$WORK_DIR" "${BOT_ENGINE:-claude}")
@@ -1021,7 +1047,7 @@ if [[ "$SKIP_CONFIG" == "false" ]]; then
         engine,
         defaultWorkingDirectory: process.argv[2],
       };
-      if (engine === 'kimi') { bot.kimi = { thinking: true }; }
+      if (engine === 'kimi') { bot.kimi = { model: 'kimi-code/k3', thinking: true, permissionMode: 'auto' }; }
       if (engine === 'codex') { bot.codex = { approvalPolicy: 'never', sandbox: 'workspace-write' }; }
       console.log(JSON.stringify([bot], null, 2))
     " "$WX_NAME" "$WORK_DIR" "${BOT_ENGINE:-claude}")
@@ -1053,7 +1079,10 @@ fi
 step "Phase 6: Installing skills and setting up workspace"
 
 SKILLS_DIR="$HOME/.claude/skills"
-mkdir -p "$SKILLS_DIR"
+CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+AGENTS_SKILLS_DIR="$HOME/.agents/skills"
+GLOBAL_SKILL_ROOTS=("$SKILLS_DIR" "$CODEX_SKILLS_DIR" "$AGENTS_SKILLS_DIR")
+mkdir -p "${GLOBAL_SKILL_ROOTS[@]}"
 
 # Sanity check: bundled skill tree must exist in the checked-out repo.
 # If it's missing, the user's checkout is stale (predates the skill bundling
@@ -1064,6 +1093,11 @@ if [[ ! -f "$SKILL_SENTINEL" ]]; then
   error "Your $METABOT_HOME checkout appears to be stale or incomplete."
   error "Try: cd $METABOT_HOME && git fetch origin && git reset --hard origin/main"
   error "(WARNING: 'git reset --hard' discards uncommitted local changes.)"
+  exit 1
+fi
+TEAM_SKILL_SENTINEL="$METABOT_HOME/packages/skills/metabot-team/SKILL.md"
+if [[ ! -f "$TEAM_SKILL_SENTINEL" ]]; then
+  error "Bundled metabot-team skill source not found at: $TEAM_SKILL_SENTINEL"
   exit 1
 fi
 
@@ -1084,18 +1118,25 @@ for legacy in metamemory skill-hub memory; do
   fi
 done
 
-# Install metabot skill (bundled in packages/skills/metabot/) — single unified
-# skill covering memory / skills / agents / t5t via the metabot-core CLI.
-info "Installing metabot skill..."
-mkdir -p "$SKILLS_DIR/metabot"
-cp "$METABOT_HOME/packages/skills/metabot/SKILL.md" "$SKILLS_DIR/metabot/SKILL.md"
-success "metabot skill installed → $SKILLS_DIR/metabot"
-
-# Install voice skill (bundled in src/skills/voice/)
-info "Installing voice skill..."
-mkdir -p "$SKILLS_DIR/voice"
-cp "$METABOT_HOME/src/skills/voice/SKILL.md" "$SKILLS_DIR/voice/SKILL.md"
-success "voice skill installed → $SKILLS_DIR/voice"
+# Install the complete MetaBot-owned skill bundles for Claude, Codex, and the
+# shared Agent Skills location used by Kimi Code 0.27+. Copying the full bundle
+# (rather than only SKILL.md) preserves required references and scripts.
+declare -a METABOT_SKILL_NAMES=("metabot" "metabot-team" "voice")
+declare -a METABOT_SKILL_SOURCES=(
+  "$METABOT_HOME/packages/skills/metabot"
+  "$METABOT_HOME/packages/skills/metabot-team"
+  "$METABOT_HOME/src/skills/voice"
+)
+for skill_index in "${!METABOT_SKILL_NAMES[@]}"; do
+  skill_name="${METABOT_SKILL_NAMES[$skill_index]}"
+  skill_source="${METABOT_SKILL_SOURCES[$skill_index]}"
+  info "Installing $skill_name skill..."
+  for skill_root in "${GLOBAL_SKILL_ROOTS[@]}"; do
+    mkdir -p "$skill_root/$skill_name"
+    cp -R "$skill_source/." "$skill_root/$skill_name/"
+    success "$skill_name skill installed → $skill_root/$skill_name"
+  done
+done
 
 # Detect Feishu bots
 HAS_FEISHU=false
@@ -1185,6 +1226,10 @@ fi
 # Deploy skills + CLAUDE.md to bot working directory
 if [[ -n "${DEPLOY_WORK_DIR:-}" ]]; then
   SKILLS_DEST="$DEPLOY_WORK_DIR/.claude/skills"
+  CODEX_SKILLS_DEST="$DEPLOY_WORK_DIR/.codex/skills"
+  AGENTS_SKILLS_DEST="$DEPLOY_WORK_DIR/.agents/skills"
+  WORKSPACE_SKILL_ROOTS=("$SKILLS_DEST" "$CODEX_SKILLS_DEST" "$AGENTS_SKILLS_DEST")
+  mkdir -p "${WORKSPACE_SKILL_ROOTS[@]}"
 
   # Clean up legacy skill bundles from a previously-deployed workspace so the
   # bot doesn't load stale skills after the Phase 4 consolidation.
@@ -1200,7 +1245,7 @@ if [[ -n "${DEPLOY_WORK_DIR:-}" ]]; then
   # scheduler) are no longer installed by default — copy them from
   # $METABOT_HOME/src/skills/ if you want them. CC native CronCreate / /loop
   # already cover ad-hoc, session-scoped scheduling.
-  DEPLOY_SKILLS="metabot voice"
+  DEPLOY_SKILLS="metabot metabot-team voice"
   if [[ "$SETUP_LARK_CLI" == "true" ]]; then
     for lark_skill in lark-base lark-calendar lark-contact lark-doc lark-drive lark-event lark-im lark-mail lark-minutes lark-openapi-explorer lark-shared lark-sheets lark-skill-maker lark-task lark-vc lark-whiteboard lark-wiki lark-workflow-meeting-summary lark-workflow-standup-report; do
       [[ -d "$SKILLS_DIR/$lark_skill" ]] && DEPLOY_SKILLS="$DEPLOY_SKILLS $lark_skill"
@@ -1208,21 +1253,30 @@ if [[ -n "${DEPLOY_WORK_DIR:-}" ]]; then
   fi
   for SKILL in $DEPLOY_SKILLS; do
     if [[ -d "$SKILLS_DIR/$SKILL" ]]; then
-      mkdir -p "$SKILLS_DEST/$SKILL"
-      cp -r "$SKILLS_DIR/$SKILL/." "$SKILLS_DEST/$SKILL/"
-      success "Deployed $SKILL → $SKILLS_DEST/$SKILL"
+      for skill_dest in "${WORKSPACE_SKILL_ROOTS[@]}"; do
+        mkdir -p "$skill_dest/$SKILL"
+        cp -R "$SKILLS_DIR/$SKILL/." "$skill_dest/$SKILL/"
+        success "Deployed $SKILL → $skill_dest/$SKILL"
+      done
     fi
   done
 
   # Deploy CLAUDE.md to working directory (+ AGENTS.md symlink for Kimi engine)
   if [[ -f "$METABOT_HOME/src/workspace/CLAUDE.md" ]]; then
-    cp "$METABOT_HOME/src/workspace/CLAUDE.md" "$DEPLOY_WORK_DIR/CLAUDE.md"
-    success "Deployed CLAUDE.md → $DEPLOY_WORK_DIR/CLAUDE.md"
-    # Kimi engine reads AGENTS.md not CLAUDE.md — symlink so both engines see the same doc
-    if [[ ! -e "$DEPLOY_WORK_DIR/AGENTS.md" ]]; then
+    if [[ -e "$DEPLOY_WORK_DIR/CLAUDE.md" || -L "$DEPLOY_WORK_DIR/CLAUDE.md" ]]; then
+      info "Preserved existing CLAUDE.md at $DEPLOY_WORK_DIR/CLAUDE.md"
+    else
+      cp "$METABOT_HOME/src/workspace/CLAUDE.md" "$DEPLOY_WORK_DIR/CLAUDE.md"
+      success "Deployed CLAUDE.md → $DEPLOY_WORK_DIR/CLAUDE.md"
+    fi
+    # Kimi Code and Codex read AGENTS.md. Derive the compatibility link from
+    # the current (possibly user-customized) CLAUDE.md instead of overwriting it.
+    if [[ ! -e "$DEPLOY_WORK_DIR/AGENTS.md" && ! -L "$DEPLOY_WORK_DIR/AGENTS.md" ]]; then
       (cd "$DEPLOY_WORK_DIR" && ln -s CLAUDE.md AGENTS.md 2>/dev/null) \
-        && success "Linked AGENTS.md → CLAUDE.md (for Kimi engine compatibility)" \
+        && success "Linked AGENTS.md → CLAUDE.md (for Kimi Code/Codex compatibility)" \
         || warn "Could not create AGENTS.md symlink"
+    else
+      info "Preserved existing AGENTS.md at $DEPLOY_WORK_DIR/AGENTS.md"
     fi
   fi
 else

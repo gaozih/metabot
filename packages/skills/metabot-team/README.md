@@ -8,9 +8,12 @@ handoffs, run inspection, and lead reporting.
 
 ```bash
 metabot skills install metabot-team --to ~/.codex/skills/metabot-team
+metabot skills install metabot-team --to ~/.agents/skills/metabot-team
+metabot skills install metabot-team --to ~/.claude/skills/metabot-team
 ```
 
-For Claude Code, install to `~/.claude/skills/metabot-team` instead.
+The one-line MetaBot installer mirrors this bundle to all three locations for
+Codex, Kimi Code, and Claude Code compatibility.
 
 ## Source of truth
 

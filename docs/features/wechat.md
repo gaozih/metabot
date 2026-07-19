@@ -89,12 +89,12 @@ Send a message to ClawBot in WeChat — MetaBot handles it and replies.
 |-------|----------|---------|-------------|
 | `name` | Yes | — | Bot identifier |
 | `description` | No | — | Bot description |
-| `defaultWorkingDirectory` | Yes | — | Working directory for Claude |
+| `defaultWorkingDirectory` | Yes | — | Working directory for the selected Agent engine |
 | `wechatBotToken` | No | — | Pre-authenticated iLink token (optional) |
 | `ilinkBaseUrl` | No | `https://ilinkai.weixin.qq.com` | iLink API URL |
 | `maxTurns` | No | unlimited | Max conversation turns |
 | `maxBudgetUsd` | No | unlimited | Max cost per request |
-| `model` | No | SDK default | Claude model |
+| `model` | No | Engine default | Model override for the selected engine |
 
 ## Environment Variable Mode
 
