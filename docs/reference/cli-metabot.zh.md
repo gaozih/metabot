@@ -66,7 +66,7 @@ metabot talk <bot> <chatId> <prompt>      # 与 Bot 对话（bridge /api/talk）
 metabot talk alice/bot <chatId> <prompt>  # 指定 peer 的 Bot 对话
 ```
 
-Bot 名称支持[限定名](../features/peers.md#限定名)（`peerName/botName`）实现跨实例
+Bot 名称支持[限定名](../features/peers.md#qualified-names)（`peerName/botName`）实现跨实例
 路由。这是 bridge 本地的对话路径；`metabot agents talk` 是基于中心注册表的 P2P
 变体。
 

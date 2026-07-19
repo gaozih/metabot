@@ -170,5 +170,5 @@ metabot teams runs stop <team> <runId>
 
 - [metabot CLI](../reference/cli-metabot.zh.md) — 完整 CLI 参考
 - [MetaSkill](metaskill.md) — 先生成团队 prompts 和 skills，再运行
-- [目标循环](goal-loops.md) — 给团队一个更长周期的目标
+- [聊天命令](../usage/chat-commands.md) — 使用 `/goal` 与 `/background`
 - [Peers 联邦](peers.md) — 跨 MetaBot 实例路由工作

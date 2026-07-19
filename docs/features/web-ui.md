@@ -8,7 +8,8 @@ The installer stores the generated Bearer token in `~/.metabot-core/token`. Past
 
 ## Chat
 
-Core Console Chat includes the former Bridge Live UI experience while retaining Core's durable Conversation, Run, and multi-Agent model:
+Core Console Chat combines live execution with Core's durable Conversation,
+Run, and multi-Agent model:
 
 - streamed Agent responses and live run state
 - tool activity from Codex, Kimi Code, and the Claude compatibility engine
@@ -31,9 +32,9 @@ browser :9200
                       └─ run state, tools, questions, and file events back to Core
 ```
 
-The source lives in `packages/web-ui/`; Vite writes the build to `packages/server/static/`. The Bridge no longer builds or hosts a second SPA.
-
-The former `http://localhost:9100/web/` URL remains as a compatibility redirect to Core Console `/chat`.
+The source lives in `packages/web-ui/`; Vite writes the build to
+`packages/server/static/`. The Bridge executes agents and relays live state; it
+does not ship another browser frontend.
 
 ## Development
 

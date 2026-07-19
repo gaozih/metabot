@@ -172,5 +172,5 @@ metabot teams runs stop <team> <runId>
 
 - [metabot CLI](../reference/cli-metabot.md) — full CLI reference
 - [MetaSkill](metaskill.md) — generate team prompts and skills before running
-- [Goal Loops](goal-loops.md) — give the team a longer-running objective
+- [Chat Commands](../usage/chat-commands.md) — use `/goal` and `/background`
 - [Peers](peers.md) — route work across MetaBot instances
