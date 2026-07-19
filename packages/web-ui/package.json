@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "metabot-core internal web console (React + Vite SPA)",
+  "description": "MetaBot Personal Core Console (React + Vite SPA)",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -30,7 +30,7 @@ metabot/
 │   ├── memory/                       # Core Memory 客户端和事件
 │   ├── sync/                         # 飞书知识库同步
 │   ├── skills/                       # Bridge 侧内置 Skills
-│   ├── web/                          # Bridge WebSocket/静态服务
+│   ├── web/                          # Bridge WebSocket 协议兼容层
 │   └── utils/                        # 日志和工具
 ├── packages/
 │   ├── server/                       # 个人 Core HTTP 后端
@@ -40,7 +40,6 @@ metabot/
 │   ├── metamemory/                   # Memory 客户端 Package
 │   ├── skill-hub/                    # Skill 注册表客户端 Package
 │   └── skills/                       # Core 分发的 Skill bundles
-├── web/                              # Bridge 浏览器 UI
 ├── bin/                              # metabot 和辅助启动器
 ├── scripts/                          # Release 和打包脚本
 ├── tests/                            # Bridge Vitest 测试

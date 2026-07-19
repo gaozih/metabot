@@ -62,7 +62,7 @@ This allows the `metabot` bridge daemon API commands to work from any machine wh
 
 ## HTTPS with Caddy
 
-HTTPS is required for the Web UI's phone call voice mode on mobile browsers (microphone access needs a secure context), and it is also the recommended default for remote CLI access and Peers federation. [Caddy](https://caddyserver.com/) is the recommended reverse proxy — it handles Let's Encrypt certificates automatically.
+HTTPS is required for Core Console voice input on mobile browsers (microphone access needs a secure context), and it is also the recommended default for remote CLI access and Peers federation. [Caddy](https://caddyserver.com/) is the recommended reverse proxy — it handles Let's Encrypt certificates automatically.
 
 ```bash
 # Install Caddy
@@ -73,7 +73,7 @@ sudo apt-get update && sudo apt-get install caddy
 # Configure (replace with your domain)
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
 metabot.yourdomain.com {
-    reverse_proxy localhost:9100
+    reverse_proxy localhost:9200
 }
 
 memory.yourdomain.com {
@@ -88,6 +88,6 @@ sudo systemctl restart caddy
 - A domain with an A record pointing to your server's public IP
 - Ports 80 and 443 open for Let's Encrypt validation
 
-Caddy automatically obtains and renews certificates. WebSocket connections (`/ws`) are proxied transparently — no additional configuration needed. Use the same HTTPS hostnames for `METABOT_URL`, `META_MEMORY_URL`, and remote peer entries in `METABOT_PEERS`.
+Caddy automatically obtains and renews certificates. Use the Core Console hostname for `METABOT_CORE_URL`; keep Bridge port `9100` private unless a separate authenticated API endpoint is required.
 
-For full setup details, see the [Web UI docs](../features/web-ui.md#https-setup).
+For the unified browser architecture, see the [Core Console docs](../features/web-ui.md#architecture).

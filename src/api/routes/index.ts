@@ -2,6 +2,8 @@ export { handleVoiceRoutes } from './voice-routes.js';
 export { handleFileRoutes } from './file-routes.js';
 export {
   acceptCoreChatRun,
+  answerCoreChatRun,
+  cancelCoreChatRun,
   handleCoreChatRoutes,
   parseCoreChatRunRequest,
 } from './core-chat-routes.js';

@@ -54,7 +54,7 @@ API_SECRET=your-secret
 
 ## HTTPS（Caddy 反向代理）
 
-移动端浏览器的 Web UI 电话语音模式需要 HTTPS（麦克风需要安全上下文）。推荐 [Caddy](https://caddyserver.com/) 做反向代理 — 自动管理 Let's Encrypt 证书。
+移动端浏览器的 Core Console 语音输入需要 HTTPS（麦克风需要安全上下文）。推荐 [Caddy](https://caddyserver.com/) 做反向代理 — 自动管理 Let's Encrypt 证书。
 
 ```bash
 # 安装 Caddy
@@ -65,7 +65,7 @@ sudo apt-get update && sudo apt-get install caddy
 # 配置（替换为你的域名）
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
 metabot.yourdomain.com {
-    reverse_proxy localhost:9100
+    reverse_proxy localhost:9200
 }
 EOF
 sudo systemctl restart caddy
@@ -76,6 +76,6 @@ sudo systemctl restart caddy
 - 域名 A 记录指向服务器公网 IP
 - 开放 80 和 443 端口用于 Let's Encrypt 验证
 
-Caddy 自动获取和续期证书。WebSocket 连接（`/ws`）透明代理，无需额外配置。
+Caddy 自动获取和续期证书。将这个域名配置为 `METABOT_CORE_URL`；除非另有受保护的 API 需求，否则 Bridge `9100` 只保留本机访问。
 
-详细设置步骤见 [Web UI 文档](../features/web-ui.md#https)。
+统一浏览器架构见 [Core Console 文档](../features/web-ui.md)。

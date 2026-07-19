@@ -293,6 +293,35 @@ async function deliverChatRunToAgent(
   }
 }
 
+function deliverChatControlToAgent(
+  inboxStore: InboxStore,
+  logger: Logger,
+  control: {
+    runId: string;
+    targetAgentRef: string;
+    action: 'answer' | 'cancel';
+    toolUseId?: string;
+    answer?: string;
+  },
+): void {
+  try {
+    const message = inboxStore.enqueue({
+      targetBot: control.targetAgentRef,
+      chatId: `core-chat-control:${control.runId}`,
+      fromBot: null,
+      fromOwner: 'metabot-core',
+      fromCredentialId: 'metabot-core-system',
+      content: JSON.stringify({ type: 'core-chat-control', ...control }),
+    });
+    logger.info(
+      { runId: control.runId, action: control.action, targetAgentRef: control.targetAgentRef, inboxMessageId: message.id },
+      'chat control enqueued for bridge relay',
+    );
+  } catch (err) {
+    logger.warn({ err, runId: control.runId, action: control.action }, 'chat control delivery failed');
+  }
+}
+
 /**
  * Structural read-only fork for web-identity (browser SSO) credentials.
  * Returns true only for the explicitly enumerated GETs in the allowlist
@@ -340,6 +369,7 @@ function isWebWritableRoute(method: string, pathname: string): boolean {
   if (/^\/api\/chat\/conversations\/[^/]+\/(messages|participants|read)$/.test(pathname) && method === 'POST') {
     return true;
   }
+  if (/^\/api\/chat\/runs\/[^/]+\/(answer|cancel)$/.test(pathname) && method === 'POST') return true;
   // Project kill (soft-kill via append-only doc) — owner-auth enforced at the
   // route layer. Matches the shape `POST /api/t5t/projects/:slug/kill`.
   if (
@@ -515,6 +545,13 @@ export function startServer(options: ServerOptions): ServerHandle {
     }) => {
       void deliverChatRunToAgent(agentStore, inboxStore, logger, run);
     },
+    deliverControl: (control: {
+      runId: string;
+      targetAgentRef: string;
+      action: 'answer' | 'cancel';
+      toolUseId?: string;
+      answer?: string;
+    }) => deliverChatControlToAgent(inboxStore, logger, control),
   };
 
   const server = http.createServer(async (req, res) => {
@@ -994,6 +1031,17 @@ export function startServer(options: ServerOptions): ServerHandle {
         const runId = decodeURIComponent(chatRunEventsMatch[1]);
         const body = await parseJsonBody(req);
         return jsonResult(res, chatRoutes.postRunEvent(chatDeps, runId, body, cred));
+      }
+      const chatRunAnswerMatch = pathname.match(/^\/api\/chat\/runs\/([^/]+)\/answer$/);
+      if (chatRunAnswerMatch && method === 'POST') {
+        const runId = decodeURIComponent(chatRunAnswerMatch[1]);
+        const body = await parseJsonBody(req);
+        return jsonResult(res, chatRoutes.answerRun(chatDeps, runId, body, cred));
+      }
+      const chatRunCancelMatch = pathname.match(/^\/api\/chat\/runs\/([^/]+)\/cancel$/);
+      if (chatRunCancelMatch && method === 'POST') {
+        const runId = decodeURIComponent(chatRunCancelMatch[1]);
+        return jsonResult(res, chatRoutes.cancelRun(chatDeps, runId, cred));
       }
       const chatConversationMatch = pathname.match(/^\/api\/chat\/conversations\/([^/]+)$/);
       if (chatConversationMatch && method === 'GET') {
