@@ -8,6 +8,7 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   custom_dir: docs/overrides
+  font: false
   palette:
     - scheme: slate
       primary: blue
@@ -32,6 +33,9 @@ theme:
     - search.suggest
   icon:
     repo: fontawesome/brands/github
+
+extra_css:
+  - assets/stylesheets/docs-theme.css
 
 markdown_extensions:
   - admonition
