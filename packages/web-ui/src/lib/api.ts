@@ -261,10 +261,23 @@ export interface ChatRunEvent {
   id?: string;
   runId: string;
   seq: number;
-  kind?: 'state' | 'question' | 'file' | 'complete' | 'error' | 'log' | string;
-  type?: 'state' | 'question' | 'file' | 'complete' | 'error' | 'log' | string;
+  kind?: 'state' | 'question' | 'file' | 'complete' | 'error' | 'log' | 'canceled' | string;
+  type?: 'state' | 'question' | 'file' | 'complete' | 'error' | 'log' | 'canceled' | string;
   payload?: unknown;
   payloadJson?: unknown;
+  createdAt: string;
+}
+
+export interface ChatFile {
+  id: string;
+  conversationId: string;
+  messageId: string | null;
+  runId: string | null;
+  name: string;
+  mimeType: string;
+  sizeBytes: number | null;
+  storageKey: string;
+  createdBy: string;
   createdAt: string;
 }
 
@@ -449,6 +462,18 @@ export const api = {
     request<{ runs: ChatRun[] }>(`/api/chat/conversations/${encodeURIComponent(conversationId)}/runs`),
   listChatRunEvents: (runId: string) =>
     request<{ events: ChatRunEvent[] }>(`/api/chat/runs/${encodeURIComponent(runId)}/events`),
+  answerChatRun: (runId: string, toolUseId: string, answer: string) =>
+    request<{ runId: string; status: string }>(`/api/chat/runs/${encodeURIComponent(runId)}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ toolUseId, answer }),
+    }),
+  cancelChatRun: (runId: string) =>
+    request<{ runId: string; status: string; queued?: boolean }>(`/api/chat/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  listChatFiles: (conversationId: string) =>
+    request<{ files: ChatFile[] }>(`/api/chat/conversations/${encodeURIComponent(conversationId)}/files`),
   listChatMessages: (conversationId: string, limit = 80) =>
     request<{ messages: ChatMessage[] }>(
       `/api/chat/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`,

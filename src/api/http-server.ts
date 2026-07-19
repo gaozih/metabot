@@ -10,7 +10,7 @@ import type { DocSync } from '../sync/doc-sync.js';
 import type { PeerManager } from './peer-manager.js';
 
 import { AsyncTaskStore } from './async-task-store.js';
-import { setupWebSocketServer, serveStaticFiles, timingSafeStrEqual, type WebSocketHandle } from '../web/ws-server.js';
+import { setupWebSocketServer, timingSafeStrEqual, type WebSocketHandle } from '../web/ws-server.js';
 import { rateLimiterFromEnv, resolveClientIp } from './request-rate-limiter.js';
 import { IntentRouter } from './intent-router.js';
 import { CircuitBreaker } from './circuit-breaker.js';
@@ -27,6 +27,8 @@ import type { SessionRegistry } from '../session/session-registry.js';
 import {
   jsonResponse,
   acceptCoreChatRun,
+  answerCoreChatRun,
+  cancelCoreChatRun,
   handleCoreChatRoutes,
   handleVoiceRoutes,
   handleFileRoutes,
@@ -201,6 +203,24 @@ export function startApiServer(options: ApiServerOptions): http.Server {
         }
         return;
       }
+      if (parsedContent && parsedContent.type === 'core-chat-control') {
+        const runId = typeof parsedContent.runId === 'string' ? parsedContent.runId : '';
+        const action = parsedContent.action;
+        if (!runId || (action !== 'answer' && action !== 'cancel')) {
+          logger.warn({ messageId: message.id, targetBot: message.targetBot }, 'invalid core-chat control payload');
+          return;
+        }
+        if (action === 'answer') {
+          const toolUseId = typeof parsedContent.toolUseId === 'string' ? parsedContent.toolUseId : '';
+          const answer = typeof parsedContent.answer === 'string' ? parsedContent.answer : '';
+          const result = answerCoreChatRun(runId, toolUseId, answer);
+          if (result.status >= 400) logger.warn({ runId, result }, 'core-chat answer rejected');
+        } else {
+          const result = await cancelCoreChatRun(ctx, runId);
+          if (result.status >= 400) logger.warn({ runId, result }, 'core-chat cancel rejected');
+        }
+        return;
+      }
 
       const botName = typeof parsedContent?.botName === 'string' && parsedContent.botName
         ? parsedContent.botName
@@ -251,6 +271,16 @@ export function startApiServer(options: ApiServerOptions): http.Server {
     const method = req.method || 'GET';
     const url = req.url || '/';
 
+    // The browser UI now lives exclusively in the Core Console. Keep the old
+    // Bridge URL as a compatibility redirect so bookmarks converge on the
+    // single token-authenticated chat surface instead of exposing two apps.
+    if (method === 'GET' && (url === '/web' || url.startsWith('/web/'))) {
+      const coreUrl = (process.env.METABOT_CORE_URL || 'http://localhost:9200').replace(/\/+$/, '');
+      res.writeHead(308, { Location: `${coreUrl}/chat` });
+      res.end();
+      return;
+    }
+
     // Resolve the client IP. We default to socket.remoteAddress because this
     // bridge is typically NOT behind a trusted reverse proxy; X-Forwarded-For is
     // only honoured when METABOT_TRUST_PROXY=1 (see resolveClientIp).
@@ -268,7 +298,7 @@ export function startApiServer(options: ApiServerOptions): http.Server {
       }
     }
 
-    // Auth check (exempt /web/, /api/files/).
+    // Auth check (output-file routes remain publicly fetchable by opaque URL).
     //
     // /api/talk and /api/tasks routes accept dual auth: the local secret
     // (metabot CLI shortcut, local cross-bot dispatch) OR any Bearer that
@@ -278,7 +308,7 @@ export function startApiServer(options: ApiServerOptions): http.Server {
     // GET /api/health is exempt: it returns only minimal liveness info (see
     // handler below) so probes/load-balancers can hit it without a secret.
     const isPublicHealth = method === 'GET' && url === '/api/health';
-    if (secret && !isPublicHealth && !url.startsWith('/web') && !url.startsWith('/api/files/')) {
+    if (secret && !isPublicHealth && !url.startsWith('/api/files/')) {
       const auth = req.headers.authorization;
       const bearer = typeof auth === 'string' && /^Bearer\s+/i.test(auth)
         ? auth.replace(/^Bearer\s+/i, '')
@@ -374,9 +404,6 @@ export function startApiServer(options: ApiServerOptions): http.Server {
       for (const handler of routeHandlers) {
         if (await handler(ctx, req, res, method, url)) return;
       }
-
-      // Static file serving for Web UI
-      if (serveStaticFiles(req, res, url)) return;
 
       // 404 fallback
       jsonResponse(res, 404, { error: 'Not found' });

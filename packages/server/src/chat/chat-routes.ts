@@ -21,6 +21,13 @@ export interface ChatRouteDeps {
     engine?: string | null;
     model?: string | null;
   }) => void;
+  deliverControl?: (control: {
+    runId: string;
+    targetAgentRef: string;
+    action: 'answer' | 'cancel';
+    toolUseId?: string;
+    answer?: string;
+  }) => void;
 }
 
 function err(status: number, error: string): RouteResult {
@@ -354,6 +361,44 @@ export function listRunEvents(deps: ChatRouteDeps, runId: string, cred: Credenti
     status: 200,
     body: { events: deps.chat.listRunEventsForUser(runId, userRef(cred)) },
   }));
+}
+
+export function answerRun(
+  deps: ChatRouteDeps,
+  runId: string,
+  body: Record<string, unknown>,
+  cred: Credential,
+): RouteResult {
+  return withChatErrors(() => {
+    const run = deps.chat.getRunForUser(runId, userRef(cred));
+    if (run.status !== 'waiting_user' && run.status !== 'running') return err(409, 'run_not_waiting');
+    const toolUseId = typeof body.toolUseId === 'string' ? body.toolUseId.trim() : '';
+    const answer = typeof body.answer === 'string' ? body.answer.trim() : '';
+    if (!toolUseId || !answer) return err(400, 'tool_use_id_and_answer_required');
+    deps.deliverControl?.({
+      runId,
+      targetAgentRef: run.targetAgentRef,
+      action: 'answer',
+      toolUseId,
+      answer,
+    });
+    return { status: 202, body: { runId, status: 'answer_queued' } };
+  });
+}
+
+export function cancelRun(deps: ChatRouteDeps, runId: string, cred: Credential): RouteResult {
+  return withChatErrors(() => {
+    const run = deps.chat.getRunForUser(runId, userRef(cred));
+    if (run.status === 'completed' || run.status === 'failed' || run.status === 'canceled') {
+      return { status: 200, body: { runId, status: run.status, queued: false } };
+    }
+    deps.deliverControl?.({
+      runId,
+      targetAgentRef: run.targetAgentRef,
+      action: 'cancel',
+    });
+    return { status: 202, body: { runId, status: 'cancel_queued', queued: true } };
+  });
 }
 
 export function listFiles(deps: ChatRouteDeps, id: string, cred: Credential): RouteResult {

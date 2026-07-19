@@ -41,6 +41,7 @@ The signed-checksum installer deploys the complete personal edition in about fiv
 MetaBot runs on your machine and does not require corporate SSO, OIDC, a VPN, or an employee directory.
 
 - The local Core and personal console default to `http://localhost:9200`.
+- There is one Web frontend: Core Console. The former Bridge URL at `http://localhost:9100/web/` redirects to `http://localhost:9200/chat` and is no longer built or maintained separately.
 - The installer generates a Bearer token, stores it at `~/.metabot-core/token` with mode `0600`, and never prints it into logs.
 - Core data stays under `~/.metabot-core/`; Bridge state stays under `~/.metabot/`.
 - Release assets are checksum-verified before extraction.
@@ -103,6 +104,8 @@ metabot health
 
 Open `http://localhost:9200`, paste the token from `~/.metabot-core/token`, and select your bot.
 
+Core Console Chat now includes the former Bridge Live UI experience: streamed responses, live tool activity, output-file cards, interactive Agent questions, run cancellation, and browser or Bridge-backed speech input. Agents, Memory, Skills, T5T, Teams, and CLI Access remain in the same token-authenticated console.
+
 | Channel | Best for | Setup |
 |---|---|---|
 | **Feishu/Lark** | Workspaces, streaming cards, files, group routing | [Feishu App Setup](docs/getting-started/feishu-app-setup.md) |
@@ -153,7 +156,7 @@ Each bot has its own channel credentials, engine, workspace, and sessions. Bots 
 - **MetaMemory** — searchable knowledge shared across sessions with optional Feishu Wiki sync. [Guide](docs/features/metamemory.md)
 - **T5T and goals** — durable project checkpoints plus supervised multi-turn execution. [Goal Loops](docs/features/goal-loops.md)
 - **Skill Hub** — install and publish reusable agent skills through the single `metabot` CLI.
-- **Local Core and Web UI** — token-authenticated Agents, Memory, Skills, Teams, chat, and diagnostics.
+- **Unified Core Console** — token-authenticated Chat, Agents, Memory, Skills, T5T, Teams, CLI Access, and diagnostics, with no second Bridge Web UI to maintain.
 - **Channels and media** — text, rich posts, images, files, audio, smart batching, and exact @Bot routing.
 - **Peers, scheduling, and voice** — optional capabilities for larger personal setups. [Feature docs](docs/)
 

@@ -6,11 +6,11 @@
 
 | 模式 | STT | TTS | 质量 | 配置时间 |
 |------|-----|-----|------|---------|
-| **Web 电话模式** | 豆包 / Whisper | 豆包 / OpenAI / ElevenLabs | 高质量 | 5 分钟 |
+| **Core Console 语音输入** | 浏览器 / 豆包 / Whisper | Agent 文本回复 | 高质量 | 5 分钟 |
 | **简单模式**（Siri STT） | Siri 内置 | Siri 朗读 | 基础 | 5 分钟 |
 | **Pro 模式**（服务端 STT） | 豆包 / Whisper | 豆包 / OpenAI / ElevenLabs | 高质量 | 10 分钟 |
 
-**新功能：Web 电话模式** — 无需 iOS 快捷指令。打开 Web UI，点击电话图标即可开始对话。VAD 自动检测说完。详见 [Web UI — 电话语音模式](web-ui.md#电话语音模式)。
+**Core Console 语音输入** — 无需 iOS 快捷指令。打开 Core Console 的 Chat，点击 **Mic**；浏览器支持时使用 Speech Recognition，否则回退到 Bridge STT。详见[统一 Core Console — Chat](web-ui.md#chat)。
 
 **推荐：Pro 模式** — 服务端 STT（豆包或 Whisper）语音识别效果远优于 Siri，尤其是中文和中英混合输入。配置火山引擎密钥后默认使用豆包。
 

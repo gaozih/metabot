@@ -19,8 +19,8 @@ function Brand() {
   return (
     <div className="brand">
       <span className="glyph" />
-      <span className="name">metabot-core</span>
-      <span className="tag">archive console</span>
+      <span className="name">metabot</span>
+      <span className="tag">personal console</span>
     </div>
   );
 }

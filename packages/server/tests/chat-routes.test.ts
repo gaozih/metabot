@@ -511,6 +511,59 @@ describe('chat routes', () => {
     expect(JSON.parse(bobEvents.body).error).toBe('chat_participant_required');
   });
 
+  it('queues interactive answers and cancellation for the owning Bridge run', async () => {
+    kit = await startTestServer('chat-run-controls', { uiAllowedEmails: ['@xvirobotics.com'] });
+    const bridge = await issueMember(kit, 'bridge-cred', ALICE);
+    kit.handle.agentStore.register({
+      botName: 'metabot',
+      url: 'http://127.0.0.1:3000',
+      visible: true,
+      ownerCredentialId: bridge.credentialId,
+      ownerName: ALICE,
+    });
+    const dm = await webJson(kit, 'POST', '/api/chat/conversations/agent-dm', ALICE, { botName: 'metabot' });
+    const conversationId = JSON.parse(dm.body).id as string;
+    const msg = await webJson(kit, 'POST', `/api/chat/conversations/${conversationId}/messages`, ALICE, {
+      content: 'ask me first',
+    });
+    const runId = JSON.parse(msg.body).runs[0].id as string;
+
+    const question = await call(kit.baseUrl, 'POST', `/api/chat/runs/${runId}/events`, bridge.token, {
+      seq: 1,
+      kind: 'question',
+      payload: { toolUseId: 'tool-1', question: { toolUseId: 'tool-1', questions: [] } },
+    });
+    expect(question.status).toBe(200);
+
+    const answer = await webJson(kit, 'POST', `/api/chat/runs/${runId}/answer`, ALICE, {
+      toolUseId: 'tool-1',
+      answer: 'Use the safe option',
+    });
+    expect(answer.status).toBe(202);
+    expect(JSON.parse(answer.body)).toMatchObject({ runId, status: 'answer_queued' });
+
+    const cancel = await webJson(kit, 'POST', `/api/chat/runs/${runId}/cancel`, ALICE, {});
+    expect(cancel.status).toBe(202);
+    expect(JSON.parse(cancel.body)).toMatchObject({ runId, status: 'cancel_queued', queued: true });
+
+    const controls = kit.handle.inboxStore.peek('metabot', undefined, 10)
+      .map((message) => JSON.parse(message.content))
+      .filter((message) => message.type === 'core-chat-control');
+    expect(controls).toMatchObject([
+      { action: 'answer', runId, targetAgentRef: 'metabot', toolUseId: 'tool-1', answer: 'Use the safe option' },
+      { action: 'cancel', runId, targetAgentRef: 'metabot' },
+    ]);
+
+    const canceled = await call(kit.baseUrl, 'POST', `/api/chat/runs/${runId}/events`, bridge.token, {
+      seq: 2,
+      kind: 'error',
+      payload: { status: 'canceled', error: 'Canceled by user' },
+    });
+    expect(canceled.status).toBe(200);
+    const runs = await webJson(kit, 'GET', `/api/chat/conversations/${conversationId}/runs`, ALICE);
+    expect(JSON.parse(runs.body).runs[0].status).toBe('canceled');
+  });
+
   it('records run file events and exposes file metadata under participant ACL', async () => {
     kit = await startTestServer('chat-run-files', { uiAllowedEmails: ['@xvirobotics.com'] });
     const bridge = await issueMember(kit, 'bridge-cred', ALICE);

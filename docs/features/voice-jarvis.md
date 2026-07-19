@@ -6,11 +6,11 @@ Talk to any MetaBot agent hands-free using AirPods and Siri. No app needed — j
 
 | Mode | STT | TTS | Quality | Setup |
 |------|-----|-----|---------|-------|
-| **Web Call** | Doubao / Whisper | Doubao / OpenAI / ElevenLabs | High | 5 min |
+| **Core Console voice input** | Browser / Doubao / Whisper | Agent text response | High | 5 min |
 | **Simple** (Siri STT) | Siri built-in | Siri Speak Text | Basic | 5 min |
 | **Pro** (Server STT) | Doubao / Whisper | Doubao / OpenAI / ElevenLabs | High | 10 min |
 
-**New: Web Call Mode** — No iOS Shortcut needed. Open the Web UI, tap the phone icon, and start talking. VAD auto-detects when you finish speaking. See [Web UI — Phone Call Mode](web-ui.md#phone-call-mode) for details.
+**Core Console voice input** — No iOS Shortcut is needed. Open Chat in Core Console and use **Mic**; the browser Speech Recognition API is used when available, with Bridge STT as the fallback. See [Unified Core Console — Chat](web-ui.md#chat).
 
 **Recommended: Pro mode** — Server-side STT (Doubao or Whisper) has much better speech recognition, especially for Chinese + mixed-language input. Doubao is the default when Volcengine keys are configured.
 

@@ -161,7 +161,7 @@ export function buildCardV2(state: CardState): string {
   // flight so a hung run is visibly hung instead of looking like a frozen
   // card, but we hide the section completely once the turn is complete/
   // errored. Web UI keeps its own collapsible per-tool view (see
-  // web/src/components/chat/AssistantMessage.tsx); this only affects the
+  // packages/web-ui/src/routes/chat.tsx); this only affects the
   // Feishu surface.
   if (
     state.toolCalls.length > 0 &&

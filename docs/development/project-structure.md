@@ -30,7 +30,7 @@ metabot/
 │   ├── memory/                       # Core Memory client and events
 │   ├── sync/                         # Feishu Wiki sync
 │   ├── skills/                       # Bundled Bridge-side skills
-│   ├── web/                          # Bridge WebSocket/static serving
+│   ├── web/                          # Bridge WebSocket compatibility layer
 │   └── utils/                        # Logging and helpers
 ├── packages/
 │   ├── server/                       # Personal Core HTTP backend
@@ -40,7 +40,6 @@ metabot/
 │   ├── metamemory/                   # Memory client package
 │   ├── skill-hub/                    # Skill registry client package
 │   └── skills/                       # Core-distributed skill bundles
-├── web/                              # Bridge browser UI
 ├── bin/                              # metabot and helper launchers
 ├── scripts/                          # Release and packaging scripts
 ├── tests/                            # Bridge Vitest suites

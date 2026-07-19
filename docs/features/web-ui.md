@@ -1,183 +1,46 @@
-# Web UI
+# Unified Core Console
 
-A full-featured browser-based chat interface for MetaBot with real-time streaming, voice call mode, and MetaMemory browsing.
+MetaBot Personal Edition ships one browser frontend: Core Console.
 
-## Overview
+**URL**: `http://localhost:9200`
 
-The Web UI is a React SPA served at `/web/` on your MetaBot server. It connects to any configured bot via WebSocket and provides the same functionality as the Feishu/Telegram chat — plus phone call voice mode.
+The installer stores the generated Bearer token in `~/.metabot-core/token`. Paste it on first open to use Chat, Agents, Memory, Skills, T5T, Teams, and CLI Access from one navigation shell.
 
-**URL**: `http://server:9100/web/` (use HTTPS for voice features — see [HTTPS Setup](#https-setup))
+## Chat
 
-## Features
+Core Console Chat includes the former Bridge Live UI experience while retaining Core's durable Conversation, Run, and multi-Agent model:
 
-- **Real-time streaming chat** — WebSocket-based streaming with tool call display
-- **Markdown rendering** — Syntax highlighting, code blocks, tables
-- **Phone call voice mode** — Tap the phone icon for hands-free voice conversation with VAD
-- **RTC real-time calls** — Two-way voice/video calls via VolcEngine RTC
-- **Group chat** — Multiple agents in one conversation with @mention routing
-- **Interactive questions** — Respond to Claude's pending questions inline
-- **Session management** — Multiple sessions, reset, bot switching
-- **MetaMemory browser** — Browse and search knowledge base documents
-- **Team dashboard** — View agent organization status overview
-- **File support** — Upload/download files with inline preview
-- **Dark/light themes** — System-aware with manual toggle
-- **Responsive design** — Works on desktop and mobile
-
-## Quick Start
-
-1. Start MetaBot: `npm run dev` or `metabot start`
-2. Open `http://localhost:9100/web/` in your browser
-3. Enter your `API_SECRET` as the token
-4. Select a bot and start chatting
-
-## Phone Call Mode
-
-Tap the phone icon in the chat input area to enter call mode — a fullscreen overlay for hands-free voice conversation.
-
-### How It Works
-
-```
-Tap phone icon → Listening...
-        ↓
-  Speak (VAD detects speech)  → "Speaking..."
-        ↓
-  Silence detected (1.8s)     → auto-stop recording
-        ↓
-  POST audio to /api/voice    → "Thinking..."
-        ↓
-  Play TTS response           → "Speaking..." (AI)
-        ↓
-  Auto-start recording again  → "Listening..."
-        ↓
-  (cycle continues until you hang up)
-```
-
-### Voice Activity Detection (VAD)
-
-The call mode uses the Web Audio API's `AnalyserNode` to detect speech in real-time:
-
-- **Speech threshold**: RMS level > 3 triggers "speaking" detection
-- **Silence duration**: 1.8 seconds of silence after speech auto-stops recording
-- **Visual feedback**: Status text changes between "Listening...", "Speaking...", "Thinking...", and "Speaking..." (AI response)
-
-### Controls
-
-| Action | What it does |
-|--------|-------------|
-| **Tap center button** (while recording) | Stop recording early |
-| **Tap center button** (while playing) | Skip AI response, start next recording |
-| **Red hang-up button** | End the call |
-
-### Mobile Support
-
-Mobile browsers require HTTPS for microphone access (`getUserMedia`). Audio playback uses `AudioContext` created during the initial tap gesture to bypass iOS/Android autoplay restrictions.
-
-## HTTPS Setup
-
-HTTPS is **required** for the phone call voice mode on mobile (and recommended for desktop). The easiest approach is [Caddy](https://caddyserver.com/) as a reverse proxy — it handles Let's Encrypt certificates automatically.
-
-### Step 1: Install Caddy
-
-```bash
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt-get update && sudo apt-get install caddy
-```
-
-### Step 2: Configure DNS
-
-Add an A record for your domain (e.g. `metabot.yourdomain.com`) pointing to your server's public IP. Wait for DNS propagation:
-
-```bash
-host metabot.yourdomain.com 1.1.1.1
-```
-
-### Step 3: Configure Caddy
-
-```bash
-sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
-metabot.yourdomain.com {
-    reverse_proxy localhost:9100
-}
-EOF
-sudo systemctl restart caddy
-```
-
-Caddy automatically obtains and renews Let's Encrypt certificates. Ports 80 and 443 must be open.
-
-Check status:
-
-```bash
-sudo journalctl -u caddy
-```
-
-Look for "certificate obtained successfully".
-
-### Step 4: Access
-
-Open `https://metabot.yourdomain.com/web/` in a browser. The phone call button now has microphone access.
-
-!!! note
-    WebSocket connections (`/ws`) are automatically proxied by Caddy. No additional WebSocket configuration is needed.
+- streamed Agent responses and live run state
+- tool activity from Codex, Kimi Code, and the Claude compatibility engine
+- Markdown, code block, table, and link rendering
+- interactive Agent questions answered in the page
+- cancellation of active runs
+- output-file metadata cards
+- browser Speech Recognition with Bridge STT fallback
+- Agent DMs and groups routed with `@Agent`
+- per-conversation engine and model selection
 
 ## Architecture
 
-**Frontend stack**: React 19 + Vite + Zustand + react-markdown
-
-**Source**: `web/` directory, builds to `dist/web/`
-
-**WebSocket flow**:
-
-```
-Browser → WebSocket (/ws?token=API_SECRET)
-       → ws-server.ts
-       → MessageBridge.executeApiTask(onUpdate, onQuestion)
-       → streaming CardState back to browser
+```text
+browser :9200
+  └─ packages/web-ui/ (the only React SPA)
+       └─ packages/server/ (token auth, conversations, runs, Memory, Skills, T5T)
+            └─ Agent Bus inbox
+                 └─ Bridge :9100 (Codex / Kimi Code / Claude execution)
+                      └─ run state, tools, questions, and file events back to Core
 ```
 
-### Key Frontend Files
+The source lives in `packages/web-ui/`; Vite writes the build to `packages/server/static/`. The Bridge no longer builds or hosts a second SPA.
 
-| File | Description |
-|------|-------------|
-| `web/src/store.ts` | Zustand store (auth, sessions, bots, theme) |
-| `web/src/hooks/useWebSocket.ts` | WebSocket with auto-reconnect + exponential backoff |
-| `web/src/components/ChatView.tsx` | Main chat interface + phone call overlay |
-| `web/src/components/VoiceView.tsx` | Phone call mode with VAD |
-| `web/src/components/RtcCallOverlay.tsx` | RTC video/voice call UI |
-| `web/src/components/MemoryView.tsx` | MetaMemory document browser |
-| `web/src/components/TeamDashboard.tsx` | Team status overview |
-| `web/src/components/InputBar.tsx` | Message input with file attachment |
-| `web/src/components/MessageList.tsx` | Real-time message streaming |
-| `web/src/theme.css` | Design system with CSS custom properties |
-
-### Static File Serving
-
-- Hashed assets (`/web/assets/*-<hash>.js`) get `Cache-Control: public, max-age=31536000, immutable`
-- `index.html` gets `Cache-Control: no-cache`
-- Missing assets return 404 (not SPA fallback) to prevent stale-cache white-screen issues
+The former `http://localhost:9100/web/` URL remains as a compatibility redirect to Core Console `/chat`.
 
 ## Development
 
-Run the Vite dev server with API/WS proxy:
-
 ```bash
-cd web && npm run dev
+npm run dev -w @xvirobotics/metabot-core-web-ui
+npm run build -w @xvirobotics/metabot-core-web-ui
+npm run build:bridge
 ```
 
-This starts Vite on port 5173 with proxy to MetaBot on port 9100.
-
-For production builds:
-
-```bash
-npm run build:web    # builds to dist/web/
-```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `API_SECRET` | — | Token for WebSocket authentication (`?token=`) |
-| `VOICE_MODEL` | — | Override Claude model for voice mode |
-| `VOLCENGINE_TTS_APPID` | — | Doubao STT + TTS (recommended for voice) |
-| `VOLCENGINE_TTS_ACCESS_KEY` | — | Doubao STT + TTS (recommended for voice) |
-| `OPENAI_API_KEY` | — | Fallback for Whisper STT + OpenAI TTS |
+The Vite development server uses port `5173` and proxies `/api`, `/admin`, and `/health` to local Core on `9200`.

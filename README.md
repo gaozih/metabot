@@ -41,6 +41,7 @@ curl -fsSL https://github.com/xvirobotics/metabot/releases/latest/download/insta
 MetaBot 运行在你自己的机器上，不依赖企业 SSO、OIDC、VPN 或员工目录。
 
 - 本地 Core 和个人控制台默认为 `http://localhost:9200`。
+- 只有一个 Web 前端：Core Console。原 Bridge `http://localhost:9100/web/` 入口会重定向到 `http://localhost:9200/chat`，不再单独构建或维护。
 - 安装器自动生成 Bearer Token，以 `0600` 权限保存到 `~/.metabot-core/token`，且不会写入日志。
 - Core 数据默认在 `~/.metabot-core/`，Bridge 状态默认在 `~/.metabot/`。
 - Release 资源解压前会验证校验和。
@@ -102,6 +103,8 @@ metabot health
 
 打开 `http://localhost:9200`，粘贴 `~/.metabot-core/token` 中的 Token，再选择 Bot。
 
+Core Console 的 Chat 已合并原 Bridge Live UI：在同一个页面里查看流式回复、工具执行和输出文件，回答 Agent 的交互问题、停止运行，并使用浏览器或 Bridge STT 进行语音输入。Agents、Memory、Skills、T5T、Teams 和 CLI Access 继续使用同一 Token 与同一套导航。
+
 | 渠道 | 适合场景 | 配置入口 |
 |---|---|---|
 | **飞书/Lark** | 工作空间、流式卡片、文件、群聊路由 | [飞书应用配置](docs/getting-started/feishu-app-setup.zh.md) |
@@ -151,7 +154,7 @@ metabot health
 - **MetaMemory** — 跨会话检索知识，并可同步到飞书知识库。[指南](docs/features/metamemory.zh.md)
 - **T5T 与 Goal** — 持久项目检查点和受监督的多轮执行。[目标循环](docs/features/goal-loops.zh.md)
 - **Skill Hub** — 通过统一的 `metabot` CLI 安装和发布可复用 Skills。
-- **本地 Core 与 Web UI** — Token 鉴权的 Agents、Memory、Skills、Teams、Chat 和诊断。
+- **统一 Core Console** — Token 鉴权的 Chat、Agents、Memory、Skills、T5T、Teams、CLI Access 和诊断；不再维护第二套 Bridge Web UI。
 - **渠道与媒体** — 文本、富文本、图片、文件、音频、智能合并和精确 @Bot 路由。
 - **Peers、调度与语音** — 面向更大个人环境的可选能力。[功能文档](docs/)
 
