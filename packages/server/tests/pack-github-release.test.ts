@@ -50,21 +50,19 @@ describe('GitHub release package', () => {
     expect(listing).toContain('packages/server/package.json');
     expect(listing).toContain('packages/web-ui/package.json');
     expect(listing).not.toContain('packages/server/static/');
+    expect(listing).not.toMatch(/(^|\n)\.?\/?web\//);
 
-    const manifest = JSON.parse(execSync(
-      `tar xOf ${JSON.stringify(TARBALL)} .metabot-package/manifest.json`,
-      { encoding: 'utf-8' },
-    ));
+    const manifest = JSON.parse(
+      execSync(`tar xOf ${JSON.stringify(TARBALL)} .metabot-package/manifest.json`, { encoding: 'utf-8' }),
+    );
     expect(manifest).toMatchObject({
       package: 'metabot-personal-edition',
+      version: '1.2.0',
       includesCore: true,
       includesWebUi: true,
     });
 
-    const packageJson = JSON.parse(execSync(
-      `tar xOf ${JSON.stringify(TARBALL)} package.json`,
-      { encoding: 'utf-8' },
-    ));
+    const packageJson = JSON.parse(execSync(`tar xOf ${JSON.stringify(TARBALL)} package.json`, { encoding: 'utf-8' }));
     expect(packageJson.workspaces).toContain('packages/server');
     expect(packageJson.workspaces).toContain('packages/web-ui');
     expect(packageJson.metabotEdition).toBe('personal');
@@ -80,14 +78,29 @@ describe('GitHub release package', () => {
     expect(source).not.toContain('echo "$METABOT_CORE_TOKEN"');
   });
 
+  it('validates pinned versions before extraction and removes only the retired UI', () => {
+    const source = fs.readFileSync(INSTALLER, 'utf-8');
+    const validation = source.indexOf('METABOT_EXPECTED_PACKAGE_VERSION');
+    const extraction = source.indexOf('tar xzf "$TARBALL_PATH"');
+    expect(validation).toBeGreaterThan(0);
+    expect(extraction).toBeGreaterThan(validation);
+    expect(source).toContain('"metabot-personal-edition"');
+    expect(source).toContain('"includesCore"');
+    expect(source).toContain('"includesWebUi"');
+    expect(source).toContain('"metabot-web"');
+    expect(source).toContain('rm -rf "$METABOT_HOME/web" "$METABOT_HOME/dist/web"');
+  });
+
   it('fails closed when public packaging is asked to embed a default env', () => {
-    expect(() => execFileSync('bash', [SCRIPT], {
-      env: {
-        ...process.env,
-        METABOT_GITHUB_RELEASE_OUTPUT_DIR: OUT_DIR,
-        METABOT_PACKAGE_DEFAULT_ENV_FILE: '/tmp/should-never-be-read',
-      },
-      stdio: 'pipe',
-    })).toThrow();
+    expect(() =>
+      execFileSync('bash', [SCRIPT], {
+        env: {
+          ...process.env,
+          METABOT_GITHUB_RELEASE_OUTPUT_DIR: OUT_DIR,
+          METABOT_PACKAGE_DEFAULT_ENV_FILE: '/tmp/should-never-be-read',
+        },
+        stdio: 'pipe',
+      }),
+    ).toThrow();
   });
 });

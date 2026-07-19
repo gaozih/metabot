@@ -53,6 +53,7 @@ _json() { python3 -m json.tool 2>/dev/null || cat; }
 
 cmd_update() {
   local update_source="${METABOT_UPDATE_SOURCE:-auto}"
+  local update_version="${METABOT_UPDATE_VERSION:-}"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --git)
@@ -63,13 +64,28 @@ cmd_update() {
         update_source="package"
         shift
         ;;
+      --version)
+        [[ $# -ge 2 ]] || { error "--version requires x.y.z"; exit 1; }
+        update_version="$2"
+        shift 2
+        ;;
+      --version=*)
+        update_version="${1#--version=}"
+        shift
+        ;;
       *)
         error "Unknown update option: $1"
-        echo "  Usage: metabot update [--package|--git]"
+        echo "  Usage: metabot update [--package|--git] [--version x.y.z]"
         exit 1
         ;;
     esac
   done
+
+  update_version="${update_version#v}"
+  if [[ -n "$update_version" ]] && [[ ! "$update_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    error "Invalid release version: $update_version (expected x.y.z)"
+    exit 1
+  fi
 
   if [[ "$update_source" == "auto" ]]; then
     if [[ -f "$METABOT_HOME/.metabot-package/manifest.json" ]]; then
@@ -81,14 +97,39 @@ cmd_update() {
     fi
   fi
 
+  if [[ -n "$update_version" && "$update_source" == "git" ]]; then
+    error "--version selects an immutable Release package and cannot be combined with --git"
+    exit 1
+  fi
+
   if [[ "$update_source" != "git" ]]; then
     # Package installs refresh from the stable GitHub Release installer asset.
     # METABOT_UPDATE_INSTALLER_URL allows mirrors without coupling OSS installs
     # to an internal metabot-core endpoint.
     if [[ -f "$METABOT_HOME/install.sh" || -d "$METABOT_HOME" ]]; then
-      local installer_url="${METABOT_UPDATE_INSTALLER_URL:-https://github.com/xvirobotics/metabot/releases/latest/download/install.sh}"
-      info "Refreshing MetaBot from GitHub Release package"
-      exec bash -c 'curl -fsSL "$1" | METABOT_HOME="$2" bash' bash "$installer_url" "$METABOT_HOME"
+      local release_base="https://github.com/xvirobotics/metabot/releases/latest/download"
+      local expected_version=""
+      if [[ -n "$update_version" ]]; then
+        release_base="https://github.com/xvirobotics/metabot/releases/download/v${update_version}"
+        expected_version="$update_version"
+      fi
+      local installer_url="${METABOT_UPDATE_INSTALLER_URL:-$release_base/install.sh}"
+      local tarball_url="${METABOT_PACKAGE_TARBALL_URL:-$release_base/metabot-runtime.tgz}"
+      local checksums_url="${METABOT_PACKAGE_CHECKSUMS_URL:-$release_base/SHA256SUMS}"
+      if [[ -n "$expected_version" ]]; then
+        info "Refreshing MetaBot from immutable GitHub Release v${expected_version}"
+      else
+        info "Refreshing MetaBot from the latest GitHub Release package"
+      fi
+      exec bash -c '
+        set -o pipefail
+        curl -fsSL "$1" |
+          METABOT_HOME="$2" \
+          METABOT_PACKAGE_TARBALL_URL="$3" \
+          METABOT_PACKAGE_CHECKSUMS_URL="$4" \
+          METABOT_EXPECTED_PACKAGE_VERSION="$5" \
+          bash
+      ' bash "$installer_url" "$METABOT_HOME" "$tarball_url" "$checksums_url" "$expected_version"
     fi
     error "MetaBot not found at $METABOT_HOME"
     echo "  Run the installer first:"
@@ -1560,6 +1601,7 @@ print_help() {
   echo "  Process control:"
   echo "    metabot update            Auto: git checkout pulls; package install downloads release"
   echo "    metabot update --package  Refresh from the latest GitHub Release package"
+  echo "    metabot update --package --version 1.2.0  Install one immutable release"
   echo "    metabot update --git      Git pull, rebuild, and restart"
   echo "    metabot start      Start MetaBot with PM2"
   echo "    metabot stop       Stop MetaBot"

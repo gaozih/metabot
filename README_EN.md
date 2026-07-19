@@ -4,7 +4,7 @@
 
 ### Run Codex and Kimi Code from Feishu/Lark, Telegram, WeChat, or the Web
 
-*A self-hosted personal agent workspace. Claude Code remains available for compatibility.*
+_A self-hosted personal agent workspace. Claude Code remains available for compatibility._
 
 <p>
   <a href="https://github.com/openai/codex"><img src="https://img.shields.io/badge/Engine-Codex_CLI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="Codex CLI"></a>
@@ -57,11 +57,11 @@ installs retain separate update paths so `metabot update` never guesses blindly.
 
 Codex is the default engine. Kimi Code is a first-class alternative. Claude Code is retained so existing Claude-based bots and workspaces continue to run.
 
-| Engine | Connects through | Authentication | Current OSS behavior |
-|---|---|---|---|
-| **Codex CLI** | `codex exec --json` and `codex exec resume` | `codex login` or OpenAI-compatible API configuration | JSONL streaming, tools, session resume, `/model`, `/effort`, bridge-managed goals and background tasks |
-| **Kimi Code 0.27+** | Official local Server API used by Kimi's own web frontend | `kimi login` | Durable Sessions, live snapshots, questions, stop/resume, tools, subagents, and goals |
-| **Claude Code compatibility** | Claude CLI / Agent SDK compatibility path | `claude login` or Anthropic-compatible API | Existing Claude sessions, skills, and workspaces remain usable |
+| Engine                        | Connects through                                          | Authentication                                       | Current OSS behavior                                                                                   |
+| ----------------------------- | --------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Codex CLI**                 | `codex exec --json` and `codex exec resume`               | `codex login` or OpenAI-compatible API configuration | JSONL streaming, tools, session resume, `/model`, `/effort`, bridge-managed goals and background tasks |
+| **Kimi Code 0.27+**           | Official local Server API used by Kimi's own web frontend | `kimi login`                                         | Durable Sessions, live snapshots, questions, stop/resume, tools, subagents, and goals                  |
+| **Claude Code compatibility** | Claude CLI / Agent SDK compatibility path                 | `claude login` or Anthropic-compatible API           | Existing Claude sessions, skills, and workspaces remain usable                                         |
 
 The public Codex adapter currently uses `codex exec`; Codex app-server and Feishu mid-turn steering for Codex/Kimi remain gated on the later shared reliability foundation.
 
@@ -79,11 +79,11 @@ Each bot selects an engine in `bots.json`; if omitted, the engine defaults to `c
 
 Engine workspace conventions remain native:
 
-| Content | Codex | Kimi Code | Claude compatibility |
-|---|---|---|---|
-| Instructions | `AGENTS.md` | `AGENTS.md` | `CLAUDE.md` compatibility entry |
-| Skills | `.codex/skills/` | `.agents/skills/` | `.claude/skills/` |
-| Subscription state | Codex profile | `~/.kimi-code/` | Claude credentials |
+| Content            | Codex            | Kimi Code         | Claude compatibility            |
+| ------------------ | ---------------- | ----------------- | ------------------------------- |
+| Instructions       | `AGENTS.md`      | `AGENTS.md`       | `CLAUDE.md` compatibility entry |
+| Skills             | `.codex/skills/` | `.agents/skills/` | `.claude/skills/`               |
+| Subscription state | Codex profile    | `~/.kimi-code/`   | Claude credentials              |
 
 The installer mirrors MetaBot's bundled skills into the active engine paths;
 your existing locally modified skills are preserved.
@@ -106,12 +106,12 @@ Open `http://localhost:9200`, paste the token from `~/.metabot-core/token`, and 
 
 Core Console Chat now includes the former Bridge Live UI experience: streamed responses, live tool activity, output-file cards, interactive Agent questions, run cancellation, and browser or Bridge-backed speech input. Agents, Memory, Skills, T5T, Teams, and CLI Access remain in the same token-authenticated console.
 
-| Channel | Best for | Setup |
-|---|---|---|
-| **Feishu/Lark** | Workspaces, streaming cards, files, group routing | [Feishu App Setup](docs/getting-started/feishu-app-setup.md) |
-| **Telegram** | Fast personal setup; no public IP required | [Quick Setup](docs/getting-started/quick-setup.md) |
-| **WeChat** | Personal WeChat through ClawBot; currently gray testing | [WeChat Guide](docs/features/wechat.md) |
-| **Web** | Browser chat, Core, Memory, Teams, and settings | `http://localhost:9200` |
+| Channel         | Best for                                                | Setup                                                        |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| **Feishu/Lark** | Workspaces, streaming cards, files, group routing       | [Feishu App Setup](docs/getting-started/feishu-app-setup.md) |
+| **Telegram**    | Fast personal setup; no public IP required              | [Quick Setup](docs/getting-started/quick-setup.md)           |
+| **WeChat**      | Personal WeChat through ClawBot; currently gray testing | [WeChat Guide](docs/features/wechat.md)                      |
+| **Web**         | Browser chat, Core, Memory, Teams, and settings         | `http://localhost:9200`                                      |
 
 Feishu uses a persistent WebSocket; Telegram and WeChat use long polling. None requires an inbound public port.
 
@@ -162,17 +162,18 @@ Each bot has its own channel credentials, engine, workspace, and sessions. Bots 
 
 ## Essential Commands
 
-| Command | Purpose |
-|---|---|
-| `/model` | Show or switch the current engine/model |
-| `/effort low\|medium\|high\|xhigh\|max\|ultra` | Set Codex reasoning effort for this chat |
-| `/status` | Show the current session and model |
-| `/reset` | Start a fresh session |
-| `/stop` | Stop the active task |
-| `/goal <condition>` | Keep working across turns until complete, blocked, or capped |
-| `/background <prompt>` | Run a supported background task while the chat continues |
-| `@Bot /group-reply mention\|all\|status` | Control one Feishu bot's reply mode in one group |
-| `metabot update` | Update the installed personal edition and restart it |
+| Command                                        | Purpose                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `/model`                                       | Show or switch the current engine/model                                |
+| `/effort low\|medium\|high\|xhigh\|max\|ultra` | Set Codex reasoning effort for this chat                               |
+| `/status`                                      | Show the current session and model                                     |
+| `/reset`                                       | Start a fresh session                                                  |
+| `/stop`                                        | Stop the active task                                                   |
+| `/goal <condition>`                            | Keep working across turns until complete, blocked, or capped           |
+| `/background <prompt>`                         | Run a supported background task while the chat continues               |
+| `@Bot /group-reply mention\|all\|status`       | Control one Feishu bot's reply mode in one group                       |
+| `metabot update`                               | Update a package-managed personal edition to the latest GitHub Release |
+| `metabot update --package --version 1.2.0`     | Install exactly the immutable v1.2.0 Release package                   |
 
 See [Chat Commands](docs/usage/chat-commands.md), the [CLI Reference](docs/reference/cli-metabot.md), and the [REST API](docs/reference/api.md) for the complete surfaces.
 
@@ -185,12 +186,21 @@ See [Chat Commands](docs/usage/chat-commands.md), the [CLI Reference](docs/refer
 
 ## Update and Development
 
-Release installs update from stable GitHub assets; source checkouts update from Git:
+For a normal package-managed personal edition, `metabot update` defaults to the
+latest GitHub Release. Pin an immutable version when reproducibility matters;
+source checkouts retain an explicit Git path:
 
 ```bash
-metabot update          # package install
-metabot update --git    # source checkout
+metabot update                                  # latest GitHub Release
+metabot update --package --version 1.2.0        # exactly v1.2.0
+metabot update --git                            # source checkout
 ```
+
+Package updates verify `SHA256SUMS`, validate the complete personal-edition
+manifest and its version, and reject a pinned-version mismatch. The overlay
+preserves `.env`, `bots.json`, `data/`, `logs/`, `~/.metabot/`, and
+`~/.metabot-core/`; only the package-owned `~/.metabot/default.env` may be
+refreshed with new safe defaults.
 
 For development:
 
